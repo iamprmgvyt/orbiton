@@ -29,6 +29,11 @@ if [ "$EUID" -ne 0 ]; then
 fi
 echo -e "${GREEN}✔ Running as root${NC}"
 
+# Stop existing services if running to free ports (80/443)
+echo -e "${YELLOW}Stopping any existing panel service to free ports...${NC}"
+systemctl stop orbiton --quiet 2>/dev/null || true
+systemctl stop vps-panel --quiet 2>/dev/null || true
+
 # Detect distro
 DISTRO=$(lsb_release -is 2>/dev/null || echo "Unknown")
 CODENAME=$(lsb_release -cs 2>/dev/null || echo "unknown")
