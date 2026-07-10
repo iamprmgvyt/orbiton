@@ -160,7 +160,7 @@ document.getElementById('btn-import-app')?.addEventListener('click', () => {
 });
 
 // ─── Create Tab switcher ──────────────────────────────────────
-function switchCreateTab(tab, btn) {
+window.switchCreateTab = function(tab, btn) {
   ['manual','template','git','zip','docker'].forEach(t => {
     const el = document.getElementById(`tab-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
@@ -186,7 +186,7 @@ async function loadTemplatesGrid() {
 }
 
 let selectedTemplate = null;
-function selectTemplate(key, el) {
+window.selectTemplate = function(key, el) {
   document.querySelectorAll('.template-card').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   selectedTemplate = key;
@@ -456,7 +456,7 @@ function bindAppActionBtns(container, appId) {
   });
 }
 
-async function appAction(appId, action) {
+window.appAction = async function(appId, action) {
   try {
     await api(`/apps/${appId}/${action}`, 'POST');
     toast(`App ${action}ed!`,'success');
@@ -464,11 +464,11 @@ async function appAction(appId, action) {
   } catch (err) { toast(err.message,'error'); }
 }
 
-async function openEditApp(appId) {
+window.openEditApp = async function(appId) {
   try { openAppModal(await api(`/apps/${appId}`)); } catch (err) { toast(err.message,'error'); }
 }
 
-async function deleteApp(appId) {
+window.deleteApp = async function(appId) {
   if (!confirm('Delete this application and all its files? This cannot be undone.')) return;
   try { await api(`/apps/${appId}`,'DELETE'); toast('App deleted','success'); loadApps(); loadDashboard(); }
   catch (err) { toast(err.message,'error'); }
@@ -567,7 +567,7 @@ function renderAppDetail(app, logs) {
   if (logEl) logEl.scrollTop = logEl.scrollHeight;
 }
 
-function switchDetailTab(tab, btn) {
+window.switchDetailTab = function(tab, btn) {
   ['logs','terminal','info'].forEach(t => {
     const el = document.getElementById(`detail-tab-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
@@ -580,7 +580,7 @@ function switchDetailTab(tab, btn) {
   }
 }
 
-async function sendAppInput(appId) {
+window.sendAppInput = async function(appId) {
   const el = document.getElementById(`stdin-${appId}`);
   if (!el?.value.trim()) return;
   try { await api(`/apps/${appId}/input`,'POST',{ input: el.value }); el.value=''; }
@@ -652,7 +652,7 @@ function buildRuntimeShortcuts() {
     cmds.map(c => `<button class="btn btn-ghost btn-sm" onclick="runShortcut(${JSON.stringify(c.c)})" style="font-size:11px">${c.l}</button>`).join('');
 }
 
-function runShortcut(cmd) { if (sysTerm) socket.emit('terminal:input',{ input:cmd+'\n' }); }
+window.runShortcut = function(cmd) { if (sysTerm) socket.emit('terminal:input',{ input:cmd+'\n' }); }
 document.getElementById('btn-clear-term').addEventListener('click', () => sysTerm?.clear());
 document.getElementById('btn-kill-term').addEventListener('click', () => socket.emit('terminal:input',{ input:'\x03' }));
 
@@ -828,7 +828,7 @@ async function loadUsers() {
       <td>${u.id!==user.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${u.username}')">Delete</button>`:'<span style="color:var(--muted);font-size:12px">You</span>'}</td></tr>`).join('');
   }catch(err){tbody.innerHTML=`<tr><td colspan="5" style="color:var(--danger)">${err.message}</td></tr>`;}
 }
-async function deleteUser(id,name) {
+window.deleteUser = async function(id,name) {
   if(!confirm(`Delete user "${name}"?`)) return;
   try { await api(`/auth/users/${id}`,'DELETE'); toast('User deleted','success'); loadUsers(); }
   catch(err){toast(err.message,'error');}
