@@ -172,11 +172,18 @@ DISABLE_SSL="false"
 
 case "$ssl_choice" in
   1)
-    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    if ! openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
       -keyout "$PANEL_DIR/certs/privkey.pem" \
       -out    "$PANEL_DIR/certs/fullchain.pem" \
-      -subj "/CN=orbiton/O=Orbiton/C=VN" -quiet 2>/dev/null
-    chmod 600 "$PANEL_DIR/certs/privkey.pem"
+      -subj "/CN=orbiton/O=Orbiton/C=VN" -quiet 2>/dev/null; then
+      echo -e "${YELLOW}  ⚠ Quiet OpenSSL generation failed, trying fallback...${NC}"
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+        -keyout "$PANEL_DIR/certs/privkey.pem" \
+        -out    "$PANEL_DIR/certs/fullchain.pem" \
+        -subj "/CN=orbiton" || true
+    fi
+    chmod 600 "$PANEL_DIR/certs/privkey.pem" 2>/dev/null || true
+    chmod 644 "$PANEL_DIR/certs/fullchain.pem" 2>/dev/null || true
     echo -e "${GREEN}✔ Self-signed SSL cert generated (10 years)${NC}"
     ;;
   2)
