@@ -7,16 +7,16 @@ const path     = require('path');
 const fs       = require('fs');
 const archiver = require('archiver');
 const mime     = require('mime-types');
-const { db }   = require('../db/database');
+const { db, DATA_DIR } = require('../db/database');
 const router   = express.Router();
 
-const BOTS_DIR = path.join(__dirname, '..', '..', '..', 'data', 'bots');
+const APPS_DIR = path.join(DATA_DIR, 'apps');
 
 // ─── Multer config ───────────────────────────────────────────
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     try {
-      const dir = safePath(req.params.botId, req.query.path || '/');
+      const dir = safePath(req.params.appId, req.query.path || '/');
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       cb(null, dir);
     } catch (e) { cb(e); }
@@ -26,28 +26,28 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
 
 // ─── Helpers ─────────────────────────────────────────────────
-function safePath(botId, relativePath = '/') {
-  const base = path.join(BOTS_DIR, botId);
+function safePath(appId, relativePath = '/') {
+  const base = path.join(APPS_DIR, appId);
   const rel  = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
   const full = path.resolve(base, '.' + rel);
   if (!full.startsWith(base)) throw new Error('Path traversal denied');
   return full;
 }
 
-function checkBotAccess(req, res) {
-  const bot = db.prepare('SELECT * FROM bots WHERE id = ?').get(req.params.botId);
-  if (!bot) { res.status(404).json({ error: 'Bot not found' }); return null; }
-  if (req.user.role !== 'admin' && bot.owner_id !== req.user.id) {
+function checkAppAccess(req, res) {
+  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.appId);
+  if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
+  if (req.user.role !== 'admin' && app.owner_id !== req.user.id) {
     res.status(403).json({ error: 'Access denied' }); return null;
   }
-  return bot;
+  return app;
 }
 
-// GET /api/files/:botId/list?path=/
-router.get('/:botId/list', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// GET /api/files/:appId/list?path=/
+router.get('/:appId/list', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
-    const dir = safePath(req.params.botId, req.query.path || '/');
+    const dir = safePath(req.params.appId, req.query.path || '/');
     if (!fs.existsSync(dir))
       return res.json({ files: [], path: req.query.path || '/' });
 
@@ -77,11 +77,11 @@ router.get('/:botId/list', (req, res) => {
   }
 });
 
-// GET /api/files/:botId/read?path=/file.txt
-router.get('/:botId/read', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// GET /api/files/:appId/read?path=/file.txt
+router.get('/:appId/read', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
-    const filePath = safePath(req.params.botId, req.query.path);
+    const filePath = safePath(req.params.appId, req.query.path);
     if (!fs.existsSync(filePath))
       return res.status(404).json({ error: 'File not found' });
     const stat = fs.statSync(filePath);
@@ -94,13 +94,13 @@ router.get('/:botId/read', (req, res) => {
   }
 });
 
-// POST /api/files/:botId/write
-router.post('/:botId/write', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// POST /api/files/:appId/write
+router.post('/:appId/write', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
     const { path: filePath, content } = req.body;
     if (!filePath) return res.status(400).json({ error: 'path required' });
-    const full = safePath(req.params.botId, filePath);
+    const full = safePath(req.params.appId, filePath);
     const dir  = path.dirname(full);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(full, content || '', 'utf8');
@@ -110,11 +110,11 @@ router.post('/:botId/write', (req, res) => {
   }
 });
 
-// DELETE /api/files/:botId/delete?path=/file.txt
-router.delete('/:botId/delete', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// DELETE /api/files/:appId/delete?path=/file.txt
+router.delete('/:appId/delete', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
-    const target = safePath(req.params.botId, req.query.path);
+    const target = safePath(req.params.appId, req.query.path);
     if (!fs.existsSync(target))
       return res.status(404).json({ error: 'Not found' });
     const stat = fs.statSync(target);
@@ -129,11 +129,11 @@ router.delete('/:botId/delete', (req, res) => {
   }
 });
 
-// POST /api/files/:botId/mkdir
-router.post('/:botId/mkdir', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// POST /api/files/:appId/mkdir
+router.post('/:appId/mkdir', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
-    const dir = safePath(req.params.botId, req.body.path);
+    const dir = safePath(req.params.appId, req.body.path);
     fs.mkdirSync(dir, { recursive: true });
     res.json({ success: true });
   } catch (err) {
@@ -141,12 +141,12 @@ router.post('/:botId/mkdir', (req, res) => {
   }
 });
 
-// POST /api/files/:botId/rename
-router.post('/:botId/rename', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// POST /api/files/:appId/rename
+router.post('/:appId/rename', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
-    const from = safePath(req.params.botId, req.body.from);
-    const to   = safePath(req.params.botId, req.body.to);
+    const from = safePath(req.params.appId, req.body.from);
+    const to   = safePath(req.params.appId, req.body.to);
     fs.renameSync(from, to);
     res.json({ success: true });
   } catch (err) {
@@ -154,19 +154,19 @@ router.post('/:botId/rename', (req, res) => {
   }
 });
 
-// POST /api/files/:botId/upload?path=/
-router.post('/:botId/upload', (req, res, next) => {
-  if (!checkBotAccess(req, res)) return;
+// POST /api/files/:appId/upload?path=/
+router.post('/:appId/upload', (req, res, next) => {
+  if (!checkAppAccess(req, res)) return;
   next();
 }, upload.array('files', 50), (req, res) => {
   res.json({ success: true, count: req.files?.length || 0 });
 });
 
-// GET /api/files/:botId/download?path=/file.txt
-router.get('/:botId/download', (req, res) => {
-  if (!checkBotAccess(req, res)) return;
+// GET /api/files/:appId/download?path=/file.txt
+router.get('/:appId/download', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
   try {
-    const target = safePath(req.params.botId, req.query.path);
+    const target = safePath(req.params.appId, req.query.path);
     if (!fs.existsSync(target))
       return res.status(404).json({ error: 'Not found' });
 
