@@ -36,20 +36,8 @@ const CERT_DIR  = path.join(__dirname, '..', 'certs');
 const CERT_FILE = path.join(CERT_DIR, 'fullchain.pem');
 const KEY_FILE  = path.join(CERT_DIR, 'privkey.pem');
 
-// ─── Security Middleware ──────────────────────────────────────
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'",
-        "cdn.jsdelivr.net", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
-      styleSrc: ["'self'", "'unsafe-inline'",
-        "cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"],
-      fontSrc: ["'self'", "fonts.gstatic.com", "cdn.jsdelivr.net"],
-      imgSrc:  ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'", "ws:", "wss:"],
-    },
-  },
+  contentSecurityPolicy: false,
 }));
 
 app.use(cors({ origin: '*' }));

@@ -219,11 +219,43 @@ if (zipDrop) {
 // ─── App Form Submit ──────────────────────────────────────────
 document.getElementById('app-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const submitBtn = document.getElementById('modal-app-submit');
-  submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
 
   const importType = document.getElementById('import-type').value;
   const appId      = document.getElementById('app-id').value;
+
+  // JS Validation to bypass hidden field browser blocks
+  if (importType === 'manual' || appId) {
+    const name = document.getElementById('app-name').value.trim();
+    const cmd  = document.getElementById('app-cmd').value.trim();
+    if (!name) { toast('App Name is required','warning'); return; }
+    if (!cmd) { toast('Start Command is required','warning'); return; }
+  } else if (importType === 'template') {
+    const name = document.getElementById('tpl-name').value.trim();
+    if (!name) { toast('App Name is required','warning'); return; }
+    if (!selectedTemplate) { toast('Please select a template','warning'); return; }
+  } else if (importType === 'git') {
+    const name = document.getElementById('git-name').value.trim();
+    const url  = document.getElementById('git-url').value.trim();
+    const cmd  = document.getElementById('git-cmd').value.trim();
+    if (!name) { toast('App Name is required','warning'); return; }
+    if (!url) { toast('Git Repo URL is required','warning'); return; }
+    if (!cmd) { toast('Start Command is required','warning'); return; }
+  } else if (importType === 'zip') {
+    const name = document.getElementById('zip-name').value.trim();
+    const cmd  = document.getElementById('zip-cmd').value.trim();
+    const file = document.getElementById('zip-input').files[0];
+    if (!name) { toast('App Name is required','warning'); return; }
+    if (!cmd) { toast('Start Command is required','warning'); return; }
+    if (!file && !appId) { toast('Please select a ZIP file','warning'); return; }
+  } else if (importType === 'docker') {
+    const name  = document.getElementById('docker-name').value.trim();
+    const image = document.getElementById('docker-image').value.trim();
+    if (!name) { toast('App Name is required','warning'); return; }
+    if (!image) { toast('Docker Image name is required','warning'); return; }
+  }
+
+  const submitBtn = document.getElementById('modal-app-submit');
+  submitBtn.disabled = true; submitBtn.textContent = 'Saving...';
 
   try {
     let envVars = {};

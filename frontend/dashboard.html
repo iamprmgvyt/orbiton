@@ -306,7 +306,7 @@
 
       <!-- ── MANUAL TAB ────────────────────────────────────── -->
       <div id="tab-manual">
-        <div class="form-group"><label class="form-label">App Name *</label><input type="text" class="form-input" id="app-name" placeholder="My Discord Bot" required /></div>
+        <div class="form-group"><label class="form-label">App Name *</label><input type="text" class="form-input" id="app-name" placeholder="My Discord Bot" /></div>
         <div class="form-group"><label class="form-label">Description</label><input type="text" class="form-input" id="app-desc" placeholder="Optional description" /></div>
         <div class="form-row">
           <div class="form-group">
@@ -330,7 +330,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Start Command *</label>
-          <input type="text" class="form-input" id="app-cmd" placeholder="node index.js  |  python3 bot.py  |  java -jar app.jar  |  docker run img" required />
+          <input type="text" class="form-input" id="app-cmd" placeholder="node index.js  |  python3 bot.py  |  java -jar app.jar  |  docker run img" />
           <div style="font-size:11px;color:var(--muted);margin-top:6px">Any command works: <code style="opacity:.7">node</code> · <code style="opacity:.7">python3</code> · <code style="opacity:.7">java -jar</code> · <code style="opacity:.7">docker run</code> · <code style="opacity:.7">./run.sh</code></div>
         </div>
         <div class="form-group"><label class="form-label">Environment Variables (JSON)</label><textarea class="form-textarea" id="app-env" placeholder='{"TOKEN": "xxx", "PORT": "3000"}'>{}</textarea></div>
@@ -341,7 +341,7 @@
       <div id="tab-template" style="display:none">
         <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Pick a preset — fills in runtime &amp; start command automatically</div>
         <div id="templates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px"></div>
-        <div class="form-group" style="margin-top:16px"><label class="form-label">App Name *</label><input type="text" class="form-input" id="tpl-name" placeholder="My App" required /></div>
+        <div class="form-group" style="margin-top:16px"><label class="form-label">App Name *</label><input type="text" class="form-input" id="tpl-name" placeholder="My App" /></div>
         <div class="form-group"><label class="form-label">Environment Variables (JSON)</label><textarea class="form-textarea" id="tpl-env" placeholder='{"TOKEN": "your-token"}'>{}</textarea></div>
         <input type="hidden" id="selected-template" />
       </div>
