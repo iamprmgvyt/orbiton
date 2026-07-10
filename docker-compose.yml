@@ -1,0 +1,42 @@
+# ============================================================
+# Orbiton — Docker Compose
+# Usage: docker compose up -d
+# ============================================================
+version: '3.9'
+
+services:
+  orbiton:
+    build: .
+    # Or use pre-built image:
+    # image: ghcr.io/your-username/orbiton:latest
+    container_name: orbiton
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # HTTP
+      - "3443:3443"   # HTTPS
+    volumes:
+      - orbiton-data:/data          # App data & SQLite DB
+      - ./certs:/app/certs:ro       # SSL certificates (optional)
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker-in-Docker support
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SSL_PORT=3443
+      - DATA_DIR=/data
+      # Generate with: openssl rand -hex 32
+      - JWT_SECRET=${JWT_SECRET:-change-me-please-use-openssl-rand-hex-32}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  orbiton-data:
+    driver: local
