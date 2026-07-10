@@ -89,14 +89,6 @@ function initDatabase() {
     );
   `);
 
-  // Default admin
-  const admin = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
-  if (!admin) {
-    const hash = bcrypt.hashSync('admin123', 10);
-    db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')`).run('admin', hash);
-    console.log('✅ Default admin: admin / admin123  (change this!)');
-  }
-
   console.log(`✅ Database: ${DB_PATH}`);
 }
 

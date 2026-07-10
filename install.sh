@@ -9,8 +9,8 @@ set -e
 PANEL_DIR="/opt/orbiton"
 DATA_DIR="/opt/orbiton-data"
 SERVICE_NAME="orbiton"
-PORT=3000
-SSL_PORT=3443
+PORT=80
+SSL_PORT=443
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; NC='\033[0m'; BOLD='\033[1m'

@@ -9,6 +9,34 @@ const { db }  = require('../db/database');
 const authMiddleware = require('../middleware/auth');
 const { JWT_SECRET } = require('../middleware/auth');
 
+// GET /api/auth/setup-status
+router.get('/setup-status', (req, res) => {
+  try {
+    const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+    res.json({ needsSetup: count === 0 });
+  } catch (err) {
+    res.json({ needsSetup: true });
+  }
+});
+
+// POST /api/auth/setup
+router.post('/setup', (req, res) => {
+  const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+  if (count > 0) {
+    return res.status(400).json({ error: 'Setup already completed' });
+  }
+
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  const hash = bcrypt.hashSync(password, 10);
+  db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')`).run(username, hash);
+
+  res.json({ success: true });
+});
+
 // POST /api/auth/login
 router.post('/login', (req, res) => {
   const { username, password } = req.body;

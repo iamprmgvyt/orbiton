@@ -143,9 +143,68 @@
       container.appendChild(p);
     }
     if (localStorage.getItem('orbiton_token')) window.location.href = '/dashboard';
+
     const form = document.getElementById('loginForm');
     const btn  = document.getElementById('loginBtn');
     const err  = document.getElementById('errorMsg');
+    let isSetupMode = false;
+
+    // Check setup status
+    async function checkSetup() {
+      try {
+        const res = await fetch('/api/auth/setup-status');
+        const data = await res.json();
+        if (data.needsSetup) {
+          isSetupMode = true;
+          document.querySelector('h1').textContent = 'First-time Setup';
+          document.querySelector('.subtitle').textContent = 'Create your administrator account';
+          btn.textContent = 'Complete Setup';
+          
+          // Add Skip button
+          const skipDiv = document.createElement('div');
+          skipDiv.style.textAlign = 'center';
+          skipDiv.style.marginTop = '16px';
+          skipDiv.innerHTML = `<a href="#" id="btnSkipSetup" style="font-size:13px;color:var(--accent);font-weight:500;text-decoration:underline">Skip & use default (admin / admin123)</a>`;
+          form.appendChild(skipDiv);
+
+          document.getElementById('btnSkipSetup').addEventListener('click', async (e) => {
+            e.preventDefault();
+            await runSetup('admin', 'admin123');
+          });
+        }
+      } catch (_) {}
+    }
+    checkSetup();
+
+    async function runSetup(username, password) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Setting up...';
+      try {
+        const res = await fetch('/api/auth/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('errorText').textContent = data.error || 'Setup failed';
+          err.classList.add('show');
+          btn.disabled = false;
+          btn.textContent = 'Complete Setup';
+          return;
+        }
+        
+        // Success! Reload page to show login form
+        alert('Setup complete! You can now log in.');
+        window.location.reload();
+      } catch (_) {
+        document.getElementById('errorText').textContent = 'Setup connection failed';
+        err.classList.add('show');
+        btn.disabled = false;
+        btn.textContent = 'Complete Setup';
+      }
+    }
+
     form.addEventListener('submit', async e => {
       e.preventDefault();
       err.classList.remove('show');
@@ -155,6 +214,12 @@
         document.getElementById('errorText').textContent = 'Please enter username and password';
         err.classList.add('show'); return;
       }
+
+      if (isSetupMode) {
+        await runSetup(username, password);
+        return;
+      }
+
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span>Signing in...';
       try {
