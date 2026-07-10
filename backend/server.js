@@ -82,7 +82,7 @@ initDatabase();
 
 // ─── Server Startup ───────────────────────────────────────────
 const httpServer = http.createServer(app);
-const hasSSL     = fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
+const hasSSL     = process.env.DISABLE_SSL !== 'true' && fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
 let   io, primaryServer;
 
 const ioOptions = { cors: { origin: '*' }, maxHttpBufferSize: 1e8 };

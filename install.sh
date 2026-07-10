@@ -158,18 +158,6 @@ npm install node-pty --build-from-source 2>/dev/null || \
 npm install node-pty 2>/dev/null || \
 echo -e "${YELLOW}  ⚠ node-pty skipped (terminal will use fallback mode)${NC}"
 
-# Create .env
-JWT_SECRET=$(openssl rand -hex 32)
-cat > "$PANEL_DIR/backend/.env" << EOF
-PORT=${PORT}
-SSL_PORT=${SSL_PORT}
-JWT_SECRET=${JWT_SECRET}
-NODE_ENV=production
-DATA_DIR=${DATA_DIR}
-EOF
-chmod 600 "$PANEL_DIR/backend/.env"
-echo -e "${GREEN}✔ Orbiton installed to ${PANEL_DIR}${NC}"
-
 # ─── SSL Certificate ──────────────────────────────────────────
 echo -e "\n${YELLOW}[7/8] SSL Certificate...${NC}"
 echo ""
@@ -179,6 +167,8 @@ echo "  [3] Skip SSL                 (HTTP only)"
 echo ""
 read -rp "  Choice [1]: " ssl_choice
 ssl_choice="${ssl_choice:-1}"
+
+DISABLE_SSL="false"
 
 case "$ssl_choice" in
   1)
@@ -201,9 +191,23 @@ case "$ssl_choice" in
     echo -e "${GREEN}✔ Let's Encrypt cert installed for ${le_domain}${NC}"
     ;;
   *)
+    DISABLE_SSL="true"
     echo -e "${YELLOW}  Skipping SSL — HTTP only${NC}"
     ;;
 esac
+
+# Create .env
+JWT_SECRET=$(openssl rand -hex 32)
+cat > "$PANEL_DIR/backend/.env" << EOF
+PORT=${PORT}
+SSL_PORT=${SSL_PORT}
+JWT_SECRET=${JWT_SECRET}
+NODE_ENV=production
+DATA_DIR=${DATA_DIR}
+DISABLE_SSL=${DISABLE_SSL}
+EOF
+chmod 600 "$PANEL_DIR/backend/.env"
+echo -e "${GREEN}✔ Orbiton installed to ${PANEL_DIR}${NC}"
 
 # ─── Systemd Service ──────────────────────────────────────────
 echo -e "\n${YELLOW}[8/8] Creating systemd service...${NC}"
