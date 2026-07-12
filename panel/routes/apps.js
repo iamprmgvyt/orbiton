@@ -40,6 +40,33 @@ const RUNTIMES = {
 };
 
 const TEMPLATES = {
+  nodejs_generic: {
+    name: 'Node.js Generic (Ptero-style)',
+    runtime: 'nodejs',
+    start_cmd: 'if [ -d .git ] && [ "$AUTO_UPDATE" = "1" ]; then git pull; fi; if [ -f package.json ]; then npm install; fi; node $MAIN_FILE $NODE_ARGS',
+    description: 'Generic Node.js app with auto dependency install and git sync support',
+    icon: '🟩',
+    env_hint: '{"MAIN_FILE": "index.js", "NODE_ARGS": "", "AUTO_UPDATE": "0"}',
+    readme: 'Automatically runs npm install if package.json exists. Set AUTO_UPDATE=1 to pull from git on startup.',
+  },
+  python_generic: {
+    name: 'Python Generic (Ptero-style)',
+    runtime: 'python',
+    start_cmd: 'if [ -d .git ] && [ "$AUTO_UPDATE" = "1" ]; then git pull; fi; if [ -f requirements.txt ]; then pip install -r requirements.txt; fi; python3 $PY_FILE',
+    description: 'Generic Python app with automatic requirements installer and git sync',
+    icon: '🐍',
+    env_hint: '{"PY_FILE": "app.py", "AUTO_UPDATE": "0"}',
+    readme: 'Automatically runs pip install if requirements.txt exists. Set AUTO_UPDATE=1 to pull from git on startup.',
+  },
+  java_generic: {
+    name: 'Java Generic (Ptero-style)',
+    runtime: 'java',
+    start_cmd: 'java -Dterminal.jline=false -Dterminal.ansi=true -jar $JARFILE',
+    description: 'Generic Java container environment for execution jars',
+    icon: '☕',
+    env_hint: '{"JARFILE": "server.jar"}',
+    readme: 'Specify your executable jar file name in JARFILE variable.',
+  },
   discord_js: {
     name: 'Discord.js Bot',
     runtime: 'nodejs',
