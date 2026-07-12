@@ -15,6 +15,7 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PANEL_DIR="/opt/orbiton-panel"
 DAEMON_DIR="/opt/orbiton-daemon"
 DATA_DIR="/opt/orbiton-data"
@@ -120,7 +121,6 @@ install_panel() {
   install_node
 
   mkdir -p "$PANEL_DIR"
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
   cp -r "$SCRIPT_DIR/panel/"* "$PANEL_DIR/"
   
   # Install deps
@@ -176,7 +176,6 @@ install_daemon() {
   install_java_python
 
   mkdir -p "$DAEMON_DIR" "$DATA_DIR/apps"
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
   cp -r "$SCRIPT_DIR/daemon/"* "$DAEMON_DIR/"
 
   # Install deps
