@@ -1,9 +1,17 @@
 #!/bin/bash
-# ============================================================
-# Orbiton - Interactive CLI Auto Installer (Pterodactyl-Style)
-# Works on Ubuntu 22/24 LTS
-# Run as root: sudo bash install.sh
-# ============================================================
+######################################################################################
+#                                                                                    #
+# Project 'orbiton-installer'                                                        #
+#                                                                                    #
+# Copyright (C) 2026, iamprmgvyt <iamprmgvyt@github.com>                             #
+#                                                                                    #
+#   This program is free software: you can redistribute it and/or modify             #
+#   it under the terms of the GNU General Public License as published by             #
+#   the Free Software Foundation, either version 3 of the License.                  #
+#                                                                                    #
+#   This script is not associated with the official Pterodactyl Project.             #
+#                                                                                    #
+######################################################################################
 
 set -e
 
@@ -25,12 +33,16 @@ fi
 
 welcome() {
   echo -e "${BLUE}${BOLD}"
-  echo "╔══════════════════════════════════════════════╗"
-  echo "║        🪐 Orbiton — CLI Auto Installer       ║"
-  echo "║           Ubuntu 22/24 LTS Support           ║"
-  echo "╚══════════════════════════════════════════════╝"
+  echo "    ____       _     _ _             "
+  echo "   / __ \\     | |   (_) |            "
+  echo "  | |  | |_ __| |__  _| |_ ___  _ __ "
+  echo "  | |  | | '__| '_ \\| | __/ _ \\| '_ \\"
+  echo "  | |__| | |  | |_) | | || (_) | | | |"
+  echo "   \\____/|_|  |_.__/|_|\\__\\___/|_| |_|"
   echo -e "${NC}"
+  echo -e "${YELLOW}   — CLI Auto Installer (Ubuntu 22/24 LTS) —${NC}\n"
 }
+
 
 safe_apt_install() {
   for pkg in "$@"; do
@@ -241,7 +253,7 @@ welcome
 done=false
 while [ "$done" == false ]; do
   options=(
-    "Install All-in-One (Panel & local Daemon on the same machine)"
+    "Install both Panel and Daemon (All-in-One on the same machine)"
     "Install Panel only (Central UI & User Database)"
     "Install Daemon only (Wings Agent on Node VPS)"
     "Configure Let's Encrypt SSL certificate"
