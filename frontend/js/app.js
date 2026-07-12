@@ -878,44 +878,11 @@ async function loadFileTree(path='/') {
     }).join('');
 
     tree.innerHTML = html;
-
-    // Event delegation for file tree
-    tree.addEventListener('click', e => {
-      // ⋮ menu button
-      const menuBtn = e.target.closest('.file-menu-btn');
-      if (menuBtn) {
-        e.stopPropagation();
-        const item = menuBtn.closest('.file-item');
-        showCtxMenu(e.clientX, e.clientY, {
-          path: item.dataset.filePath,
-          type: item.dataset.fileType,
-          name: item.dataset.fileName,
-        });
-        return;
-      }
-      // Navigate or open
-      const item = e.target.closest('[data-nav-path],[data-open-file]');
-      if (!item) return;
-      if (item.dataset.navPath !== undefined) loadFileTree(item.dataset.navPath);
-      else if (item.dataset.openFile !== undefined) openFile(item.dataset.openFile);
-    }, { once: true });
-
-    // Right-click context menu on file items
-    tree.addEventListener('contextmenu', e => {
-      const item = e.target.closest('[data-file-path]');
-      if (!item) return;
-      e.preventDefault();
-      showCtxMenu(e.clientX, e.clientY, {
-        path: item.dataset.filePath,
-        type: item.dataset.fileType,
-        name: item.dataset.fileName,
-      });
-    }, { once: true });
-
   } catch(err) {
     tree.innerHTML = `<div style="padding:16px;color:var(--danger);font-size:13px">Error: ${err.message}</div>`;
   }
 }
+
 
 function getFileIcon(n) {
   const ext=n.split('.').pop().toLowerCase();
@@ -1100,6 +1067,41 @@ document.getElementById('dashboard-apps-list').addEventListener('click', async e
     const row = btn.closest('[data-app-id]');
     if (row) handleAppButtonClick(row.dataset.appId, btn.dataset.action);
   }
+});
+
+// ─── FILE TREE GLOBAL DELEGATORS ──────────────────────────────
+const fileTree = document.getElementById('file-tree');
+fileTree.addEventListener('click', e => {
+  // ⋮ menu button
+  const menuBtn = e.target.closest('.file-menu-btn');
+  if (menuBtn) {
+    e.stopPropagation();
+    const item = menuBtn.closest('.file-item');
+    if (item) {
+      showCtxMenu(e.clientX, e.clientY, {
+        path: item.dataset.filePath,
+        type: item.dataset.fileType,
+        name: item.dataset.fileName,
+      });
+    }
+    return;
+  }
+  // Navigate or open file
+  const item = e.target.closest('[data-nav-path],[data-open-file]');
+  if (!item) return;
+  if (item.dataset.navPath !== undefined) loadFileTree(item.dataset.navPath);
+  else if (item.dataset.openFile !== undefined) openFile(item.dataset.openFile);
+});
+
+fileTree.addEventListener('contextmenu', e => {
+  const item = e.target.closest('[data-file-path]');
+  if (!item) return;
+  e.preventDefault();
+  showCtxMenu(e.clientX, e.clientY, {
+    path: item.dataset.filePath,
+    type: item.dataset.fileType,
+    name: item.dataset.fileName,
+  });
 });
 
 // ─── Init ─────────────────────────────────────────────────────
