@@ -293,11 +293,11 @@
 
     <!-- Tabs: Template / Manual -->
     <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px" id="create-tabs">
-      <button class="btn btn-ghost btn-sm active" id="tab-manual-btn"   onclick="switchCreateTab('manual',this)">✏️ Manual</button>
-      <button class="btn btn-ghost btn-sm"         id="tab-template-btn" onclick="switchCreateTab('template',this)">⚡ Templates</button>
-      <button class="btn btn-ghost btn-sm"         id="tab-git-btn"      onclick="switchCreateTab('git',this)">🔀 Git Clone</button>
-      <button class="btn btn-ghost btn-sm"         id="tab-zip-btn"      onclick="switchCreateTab('zip',this)">📦 ZIP Upload</button>
-      <button class="btn btn-ghost btn-sm"         id="tab-docker-btn"   onclick="switchCreateTab('docker',this)">🐳 Docker</button>
+      <button class="btn btn-ghost btn-sm active" id="tab-manual-btn"   data-tab="manual">✏️ Manual</button>
+      <button class="btn btn-ghost btn-sm"         id="tab-template-btn" data-tab="template">⚡ Templates</button>
+      <button class="btn btn-ghost btn-sm"         id="tab-git-btn"      data-tab="git">🔀 Git Clone</button>
+      <button class="btn btn-ghost btn-sm"         id="tab-zip-btn"      data-tab="zip">📦 ZIP Upload</button>
+      <button class="btn btn-ghost btn-sm"         id="tab-docker-btn"   data-tab="docker">🐳 Docker</button>
     </div>
 
     <form id="app-form">

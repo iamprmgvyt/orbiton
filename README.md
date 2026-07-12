@@ -47,7 +47,7 @@ Lightweight, self-hosted panel to manage any application — Node.js, Python, Ja
 
 ```bash
 # Clone
-git clone https://github.com/your-username/orbiton.git
+git clone https://github.com/iamprmgvyt/orbiton.git
 cd orbiton
 
 # Run with Docker Compose
@@ -59,7 +59,7 @@ docker compose up -d
 ### Method 2: Auto-Install (Ubuntu 24 LTS)
 
 ```bash
-git clone https://github.com/your-username/orbiton.git
+git clone https://github.com/iamprmgvyt/orbiton.git
 cd orbiton
 sudo bash install.sh
 ```
@@ -70,7 +70,7 @@ Automatically installs: Node.js, Python 3, Java 21, Docker, SSL certs, and syste
 
 ```bash
 # Prerequisites: Node.js 18+, git
-git clone https://github.com/your-username/orbiton.git
+git clone https://github.com/iamprmgvyt/orbiton.git
 cd orbiton/backend
 npm install
 
@@ -272,7 +272,7 @@ docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e JWT_SECRET=$(openssl rand -hex 32) \
   --name orbiton \
-  ghcr.io/your-username/orbiton:latest
+  ghcr.io/iamprmgvyt/orbiton:latest
 ```
 
 ---

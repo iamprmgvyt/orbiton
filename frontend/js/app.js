@@ -139,7 +139,7 @@ function openAppModal(editData = null) {
   document.getElementById('app-ram').value     = editData?.max_ram || 512;
   document.getElementById('app-autorestart').checked = !!(editData?.auto_restart);
   document.getElementById('app-env').value     = JSON.stringify(editData?.env_vars || {}, null, 2);
-  switchCreateTab('manual', document.getElementById('tab-manual-btn'));
+  switchCreateTab('manual');
   modalApp.classList.add('open');
   loadTemplatesGrid();
 }
@@ -156,47 +156,53 @@ modalApp.addEventListener('click', e => { if (e.target === modalApp) modalApp.cl
 // Import shortcut button
 document.getElementById('btn-import-app')?.addEventListener('click', () => {
   openAppModal();
-  setTimeout(() => switchCreateTab('git', document.getElementById('tab-git-btn')), 50);
+  setTimeout(() => switchCreateTab('git'), 50);
 });
 
-// ─── Create Tab switcher ──────────────────────────────────────
-window.switchCreateTab = function(tab, btn) {
+// ─── Create Tab switcher (event delegation — no inline onclick) ───
+function switchCreateTab(tab) {
   ['manual','template','git','zip','docker'].forEach(t => {
     const el = document.getElementById(`tab-${t}`);
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   document.querySelectorAll('#create-tabs .btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`#create-tabs [data-tab="${tab}"]`);
   if (btn) btn.classList.add('active');
   document.getElementById('import-type').value = tab;
 }
 
+document.getElementById('create-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('[data-tab]');
+  if (btn) switchCreateTab(btn.dataset.tab);
+});
+
 // ─── Templates Grid ───────────────────────────────────────────
+let selectedTemplate = null;
 async function loadTemplatesGrid() {
   const grid = document.getElementById('templates-grid');
   if (!grid || grid.children.length > 0) return;
   try {
     const tpls = await api('/apps/templates');
     grid.innerHTML = Object.entries(tpls).map(([key, t]) => `
-      <div class="template-card" onclick="selectTemplate('${key}',this)" data-key="${key}">
+      <div class="template-card" data-key="${key}">
         <div class="template-icon">${t.icon || '📦'}</div>
         <div class="template-name">${t.name}</div>
         <div class="template-desc">${t.description || ''}</div>
       </div>`).join('');
+    // Event delegation for template selection
+    grid.addEventListener('click', e => {
+      const card = e.target.closest('[data-key]');
+      if (!card) return;
+      const key = card.dataset.key;
+      grid.querySelectorAll('.template-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+      selectedTemplate = key;
+      document.getElementById('selected-template').value = key;
+      api('/apps/templates').then(tpls => {
+        if (tpls[key]?.env_hint) document.getElementById('tpl-env').value = tpls[key].env_hint;
+      }).catch(() => {});
+    });
   } catch (_) {}
-}
-
-let selectedTemplate = null;
-window.selectTemplate = function(key, el) {
-  document.querySelectorAll('.template-card').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  selectedTemplate = key;
-  document.getElementById('selected-template').value = key;
-  // Pre-fill env hint
-  api('/apps/templates').then(tpls => {
-    if (tpls[key]?.env_hint) {
-      document.getElementById('tpl-env').value = tpls[key].env_hint;
-    }
-  }).catch(() => {});
 }
 
 // ─── ZIP drag & drop ──────────────────────────────────────────
@@ -537,25 +543,25 @@ function renderAppDetail(app, logs) {
         ${app.pid?`<span style="font-size:11px;color:var(--muted)">PID: ${app.pid}</span>`:''}
       </div>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn btn-success btn-sm" onclick="appAction('${app.id}','start')">▶ Start</button>
-      <button class="btn btn-warning btn-sm" onclick="appAction('${app.id}','stop')">⏹ Stop</button>
-      <button class="btn btn-ghost btn-sm"   onclick="appAction('${app.id}','restart')">🔄 Restart</button>
-      <button class="btn btn-danger btn-sm"  onclick="appAction('${app.id}','kill')">💀 Kill</button>
-      <button class="btn btn-ghost btn-sm"   onclick="openEditApp('${app.id}')">✏️ Edit</button>
+    <div class="app-detail-actions" style="display:flex;gap:6px;flex-wrap:wrap" data-app-id="${app.id}">
+      <button class="btn btn-success btn-sm" data-action="start">▶ Start</button>
+      <button class="btn btn-warning btn-sm" data-action="stop">⏹ Stop</button>
+      <button class="btn btn-ghost btn-sm"   data-action="restart">🔄 Restart</button>
+      <button class="btn btn-danger btn-sm"  data-action="kill">💀 Kill</button>
+      <button class="btn btn-ghost btn-sm"   data-action="edit">✏️ Edit</button>
     </div>
   </div>
   <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:20px" id="detail-tabs">
-    <button class="btn btn-ghost btn-sm active" onclick="switchDetailTab('logs',this)">📋 Logs</button>
-    <button class="btn btn-ghost btn-sm"        onclick="switchDetailTab('terminal',this)">⌨️ Terminal</button>
-    <button class="btn btn-ghost btn-sm"        onclick="switchDetailTab('info',this)">ℹ️ Info</button>
+    <button class="btn btn-ghost btn-sm active" data-tab="logs">📋 Logs</button>
+    <button class="btn btn-ghost btn-sm"        data-tab="terminal">⌨️ Terminal</button>
+    <button class="btn btn-ghost btn-sm"        data-tab="info">ℹ️ Info</button>
   </div>
   <div id="detail-tab-logs">
     <div class="log-output" id="detail-log-output">${logs.length?logs.join(''):'<span style="color:var(--muted)">No logs yet. Start the app to see output.</span>'}</div>
     <div class="console-input-row">
       <span style="color:var(--muted);font-size:13px;white-space:nowrap">stdin ❯</span>
-      <input class="console-input" id="stdin-${app.id}" placeholder="Send input to process stdin (works for any runtime)..." />
-      <button class="btn btn-primary btn-sm" onclick="sendAppInput('${app.id}')">Send</button>
+      <input class="console-input" id="stdin-input" placeholder="Send input to process stdin..." data-app-id="${app.id}" />
+      <button class="btn btn-primary btn-sm" id="btn-send-stdin" data-app-id="${app.id}">Send</button>
     </div>
   </div>
   <div id="detail-tab-terminal" style="display:none">
@@ -585,6 +591,47 @@ function renderAppDetail(app, logs) {
     </div>
   </div>`;
 
+  // App detail control buttons — event delegation
+  content.querySelector('.app-detail-actions').addEventListener('click', async e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === 'edit') { openEditApp(app.id); return; }
+    await appAction(app.id, action);
+  });
+
+  // Detail tabs — event delegation
+  document.getElementById('detail-tabs').addEventListener('click', e => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    const tab = btn.dataset.tab;
+    ['logs','terminal','info'].forEach(t => {
+      const el = document.getElementById(`detail-tab-${t}`);
+      if (el) el.style.display = t === tab ? 'block' : 'none';
+    });
+    document.querySelectorAll('#detail-tabs .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (tab === 'terminal') {
+      const xt = document.querySelector('[id^="detail-xterm-"]');
+      if (xt) initAppTerminal(xt.id.replace('detail-xterm-',''));
+    }
+  });
+
+  // stdin send button
+  content.querySelector('#btn-send-stdin').addEventListener('click', async () => {
+    const el = content.querySelector('#stdin-input');
+    if (!el?.value.trim()) return;
+    try { await api(`/apps/${app.id}/input`,'POST',{ input: el.value }); el.value=''; }
+    catch (err) { toast(err.message,'error'); }
+  });
+  content.querySelector('#stdin-input').addEventListener('keydown', async e => {
+    if (e.key !== 'Enter') return;
+    const el = e.target;
+    if (!el?.value.trim()) return;
+    try { await api(`/apps/${app.id}/input`,'POST',{ input: el.value }); el.value=''; }
+    catch (err) { toast(err.message,'error'); }
+  });
+
   // Subscribe to live logs
   socket.emit('app:subscribe', { appId: app.id });
   socket.off('app:log');
@@ -597,26 +644,6 @@ function renderAppDetail(app, logs) {
 
   const logEl = document.getElementById('detail-log-output');
   if (logEl) logEl.scrollTop = logEl.scrollHeight;
-}
-
-window.switchDetailTab = function(tab, btn) {
-  ['logs','terminal','info'].forEach(t => {
-    const el = document.getElementById(`detail-tab-${t}`);
-    if (el) el.style.display = t === tab ? 'block' : 'none';
-  });
-  document.querySelectorAll('#detail-tabs .btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  if (tab === 'terminal') {
-    const xt = document.querySelector('[id^="detail-xterm-"]');
-    if (xt) initAppTerminal(xt.id.replace('detail-xterm-',''));
-  }
-}
-
-window.sendAppInput = async function(appId) {
-  const el = document.getElementById(`stdin-${appId}`);
-  if (!el?.value.trim()) return;
-  try { await api(`/apps/${appId}/input`,'POST',{ input: el.value }); el.value=''; }
-  catch (err) { toast(err.message,'error'); }
 }
 
 document.getElementById('btn-back-apps').addEventListener('click', () => {
@@ -681,10 +708,12 @@ function buildRuntimeShortcuts() {
     {l:'df -h',c:'df -h'},{l:'free -h',c:'free -h'},{l:'whoami',c:'whoami && pwd'},{l:'env',c:'env | head -20'},
   ];
   shortcuts.innerHTML = '<span style="color:var(--muted);font-size:12px;display:flex;align-items:center">Quick:</span>' +
-    cmds.map(c => `<button class="btn btn-ghost btn-sm" onclick="runShortcut(${JSON.stringify(c.c)})" style="font-size:11px">${c.l}</button>`).join('');
+    cmds.map(c => `<button class="btn btn-ghost btn-sm" data-cmd="${c.c.replace(/"/g,'&quot;')}" style="font-size:11px">${c.l}</button>`).join('');
+  shortcuts.addEventListener('click', e => {
+    const btn = e.target.closest('[data-cmd]');
+    if (btn && sysTerm) socket.emit('terminal:input', { input: btn.dataset.cmd + '\n' });
+  });
 }
-
-window.runShortcut = function(cmd) { if (sysTerm) socket.emit('terminal:input',{ input:cmd+'\n' }); }
 document.getElementById('btn-clear-term').addEventListener('click', () => sysTerm?.clear());
 document.getElementById('btn-kill-term').addEventListener('click', () => socket.emit('terminal:input',{ input:'\x03' }));
 
@@ -710,13 +739,22 @@ async function loadFileTree(path='/') {
   const tree=document.getElementById('file-tree');
   try {
     const data = await api(`/files/${curAppId}/list?path=${encodeURIComponent(path)}`);
-    const parent = path!=='/'?`<div class="file-item" onclick="loadFileTree('${path.split('/').slice(0,-1).join('/')||'/'}')"><span class="file-icon">⬅️</span><span class="file-name">..</span></div>`:'';
-    tree.innerHTML=`<div class="file-tree-header">📁 ${path}</div>${parent}${data.files.map(f=>`
-      <div class="file-item" onclick="${f.type==='dir'?`loadFileTree('${(path==='/'?'':path)}/${f.name}')`:`openFile('${(path==='/'?'':path)}/${f.name}')`}">
-        <span class="file-icon">${f.type==='dir'?'📁':getFileIcon(f.name)}</span>
-        <span class="file-name">${f.name}</span>
-        <span class="file-size">${f.type==='file'?fmtBytes(f.size):''}</span>
-      </div>`).join('')}`;
+    const parentPath = path!=='/' ? path.split('/').slice(0,-1).join('/')||'/' : null;
+    const parentHtml = parentPath ? `<div class="file-item" data-nav-path="${parentPath}"><span class="file-icon">⬅️</span><span class="file-name">..</span></div>` : '';
+    const filesHtml = data.files.map(f => {
+      const fp = (path==='/'?'':path)+'/'+f.name;
+      return f.type==='dir'
+        ? `<div class="file-item" data-nav-path="${fp}"><span class="file-icon">📁</span><span class="file-name">${f.name}</span><span class="file-size"></span></div>`
+        : `<div class="file-item" data-open-file="${fp}"><span class="file-icon">${getFileIcon(f.name)}</span><span class="file-name">${f.name}</span><span class="file-size">${fmtBytes(f.size)}</span></div>`;
+    }).join('');
+    tree.innerHTML = `<div class="file-tree-header">📁 ${path}</div>${parentHtml}${filesHtml}`;
+    // Event delegation — no inline onclick
+    tree.addEventListener('click', e => {
+      const item = e.target.closest('[data-nav-path],[data-open-file]');
+      if (!item) return;
+      if (item.dataset.navPath !== undefined) loadFileTree(item.dataset.navPath);
+      else if (item.dataset.openFile !== undefined) openFile(item.dataset.openFile);
+    }, { once: true });
   } catch(err) { tree.innerHTML=`<div style="padding:16px;color:var(--danger);font-size:13px">Error: ${err.message}</div>`; }
 }
 
@@ -857,13 +895,18 @@ async function loadUsers() {
       <tr><td style="color:var(--muted)">${u.id}</td><td><strong>${u.username}</strong></td>
       <td><span style="padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;background:${u.role==='admin'?'rgba(124,58,237,0.15)':'rgba(255,255,255,0.05)'};color:${u.role==='admin'?'#c4b5fd':'var(--text2)'}">${u.role}</span></td>
       <td style="color:var(--muted);font-size:12px">${fmtDate(u.created_at)}</td>
-      <td>${u.id!==user.id?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${u.username}')">Delete</button>`:'<span style="color:var(--muted);font-size:12px">You</span>'}</td></tr>`).join('');
+      <td>${u.id!==user.id?`<button class="btn btn-danger btn-sm" data-del-user="${u.id}" data-del-name="${u.username}">Delete</button>`:'<span style="color:var(--muted);font-size:12px">You</span>'}</td></tr>`).join('');
+    // Event delegation for delete buttons — no inline onclick
+    tbody.addEventListener('click', async e => {
+      const btn = e.target.closest('[data-del-user]');
+      if (!btn) return;
+      const id = btn.dataset.delUser;
+      const name = btn.dataset.delName;
+      if (!confirm(`Delete user "${name}"?`)) return;
+      try { await api(`/auth/users/${id}`,'DELETE'); toast('User deleted','success'); loadUsers(); }
+      catch(err){toast(err.message,'error');}
+    }, { once: true });
   }catch(err){tbody.innerHTML=`<tr><td colspan="5" style="color:var(--danger)">${err.message}</td></tr>`;}
-}
-window.deleteUser = async function(id,name) {
-  if(!confirm(`Delete user "${name}"?`)) return;
-  try { await api(`/auth/users/${id}`,'DELETE'); toast('User deleted','success'); loadUsers(); }
-  catch(err){toast(err.message,'error');}
 }
 
 // ─── SETTINGS ─────────────────────────────────────────────────
