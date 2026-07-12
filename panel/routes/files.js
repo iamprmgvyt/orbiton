@@ -109,17 +109,20 @@ router.post('/:appId/extract', async (req, res) => {
 router.post('/:appId/upload', upload.array('files', 50), async (req, res) => {
   if (!checkAppAccess(req, res, req.params.appId)) return;
   try {
-    const FormData = require('form-data');
-    const fd = new FormData();
-    req.files.forEach(f => {
-      fd.append('files', fs.createReadStream(f.path), f.originalname);
-    });
-    const fetch = global.fetch || require('node-fetch');
+    const fd = new globalThis.FormData();
+    for (const f of req.files) {
+      const fileBuffer = fs.readFileSync(f.path);
+      const fileBlob = new globalThis.Blob([fileBuffer]);
+      fd.append('files', fileBlob, f.originalname);
+      // clean temp local file asynchronously
+      fs.unlink(f.path, () => {});
+    }
+
+    const fetch = globalThis.fetch;
     const resDaemon = await fetch(`${DAEMON_URL}/api/files/${req.params.appId}/upload?path=${encodeURIComponent(req.query.path || '/')}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DAEMON_TOKEN}`,
-        ...fd.getHeaders()
+        'Authorization': `Bearer ${DAEMON_TOKEN}`
       },
       body: fd
     });

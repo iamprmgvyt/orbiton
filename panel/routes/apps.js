@@ -310,15 +310,19 @@ router.post('/:id/import/zip', zipUpload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'ZIP file required' });
 
   try {
-    const fd = new FormData();
-    fd.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+    const fd = new globalThis.FormData();
+    const fileBuffer = fs.readFileSync(req.file.path);
+    const fileBlob = new globalThis.Blob([fileBuffer]);
+    fd.append('file', fileBlob, req.file.originalname);
     
-    const fetch = global.fetch || require('node-fetch');
+    // Clean temp local file asynchronously
+    fs.unlink(req.file.path, () => {});
+
+    const fetch = globalThis.fetch;
     const resDaemon = await fetch(`${DAEMON_URL}/api/apps/${app.id}/import/zip`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DAEMON_TOKEN}`,
-        ...fd.getHeaders()
+        'Authorization': `Bearer ${DAEMON_TOKEN}`
       },
       body: fd
     });
