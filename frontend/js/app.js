@@ -719,6 +719,105 @@ document.getElementById('btn-kill-term').addEventListener('click', () => socket.
 
 // ─── FILE MANAGER ─────────────────────────────────────────────
 let curAppId=null, curPath='/', curFile=null;
+let ctxTarget = null; // { path, type, name }
+
+// ── Context Menu setup ────────────────────────────────────────
+const ctxMenu = document.getElementById('file-ctx-menu');
+
+function showCtxMenu(x, y, target) {
+  ctxTarget = target;
+  // Show/hide Extract option only for archives
+  const isArchive = /\.(zip|tar\.gz|tgz)$/i.test(target.name);
+  ctxMenu.querySelector('[data-ctx="extract"]').style.display = isArchive ? 'flex' : 'none';
+  // Position menu within viewport
+  ctxMenu.style.display = 'block';
+  const mw = ctxMenu.offsetWidth  || 190;
+  const mh = ctxMenu.offsetHeight || 220;
+  ctxMenu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
+  ctxMenu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
+}
+
+function hideCtxMenu() { ctxMenu.style.display = 'none'; ctxTarget = null; }
+
+document.addEventListener('click', e => {
+  if (!ctxMenu.contains(e.target)) hideCtxMenu();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtxMenu(); });
+
+// Context menu action handler
+ctxMenu.addEventListener('click', async e => {
+  const item = e.target.closest('[data-ctx]');
+  if (!item || !ctxTarget) return;
+  const action = item.dataset.ctx;
+  hideCtxMenu();
+  await handleFileAction(action, ctxTarget);
+});
+
+async function handleFileAction(action, target) {
+  const { path: fp, type, name } = target;
+  switch (action) {
+    case 'rename': {
+      const newName = prompt(`Rename "${name}" to:`, name);
+      if (!newName || newName === name) return;
+      const dir    = fp.split('/').slice(0,-1).join('/') || '/';
+      const newPath = `${dir === '/' ? '' : dir}/${newName}`;
+      try {
+        await api(`/files/${curAppId}/rename`, 'POST', { from: fp, to: newPath });
+        toast(`Renamed to "${newName}"`, 'success');
+        if (curFile === fp) { curFile = newPath; document.getElementById('file-path').textContent = newPath; }
+        loadFileTree(curPath);
+      } catch(err) { toast(err.message, 'error'); }
+      break;
+    }
+    case 'move': {
+      const dest = prompt(`Move "${name}" to path (e.g. /folder/subfolder):`, fp.split('/').slice(0,-1).join('/') || '/');
+      if (!dest) return;
+      const destPath = `${dest.endsWith('/') ? dest.slice(0,-1) : dest}/${name}`;
+      try {
+        await api(`/files/${curAppId}/move`, 'POST', { from: fp, to: destPath });
+        toast(`Moved to "${destPath}"`, 'success');
+        loadFileTree(curPath);
+      } catch(err) { toast(err.message, 'error'); }
+      break;
+    }
+    case 'archive-zip':
+    case 'archive-targz': {
+      const fmt      = action === 'archive-zip' ? 'zip' : 'tar.gz';
+      const baseName = prompt(`Archive name (without extension):`, name);
+      if (!baseName) return;
+      try {
+        toast(`Creating ${fmt} archive...`, 'info', 2000);
+        await api(`/files/${curAppId}/archive`, 'POST', { path: fp, format: fmt, destName: baseName });
+        toast(`Archive "${baseName}.${fmt}" created!`, 'success');
+        loadFileTree(curPath);
+      } catch(err) { toast(err.message, 'error'); }
+      break;
+    }
+    case 'extract': {
+      try {
+        toast(`Extracting "${name}"...`, 'info', 2000);
+        await api(`/files/${curAppId}/extract`, 'POST', { path: fp });
+        toast('Extracted successfully!', 'success');
+        loadFileTree(curPath);
+      } catch(err) { toast(err.message, 'error'); }
+      break;
+    }
+    case 'download': {
+      window.open(`/api/files/${curAppId}/download?path=${encodeURIComponent(fp)}`);
+      break;
+    }
+    case 'delete': {
+      if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+      try {
+        await api(`/files/${curAppId}/delete?path=${encodeURIComponent(fp)}`, 'DELETE');
+        toast('Deleted!', 'success');
+        if (curFile === fp) { curFile = null; document.getElementById('file-content').value = ''; document.getElementById('file-path').textContent = 'No file selected'; ['btn-save-file','btn-download-file','btn-delete-file'].forEach(id => document.getElementById(id).style.display = 'none'); }
+        loadFileTree(curPath);
+      } catch(err) { toast(err.message, 'error'); }
+      break;
+    }
+  }
+}
 
 async function loadFileAppSelect() {
   const sel = document.getElementById('file-app-select');
@@ -735,32 +834,76 @@ document.getElementById('file-app-select').addEventListener('change', e => {
 
 async function loadFileTree(path='/') {
   if (!curAppId) return;
-  curPath=path;
-  const tree=document.getElementById('file-tree');
+  curPath = path;
+  const tree = document.getElementById('file-tree');
   try {
     const data = await api(`/files/${curAppId}/list?path=${encodeURIComponent(path)}`);
-    const parentPath = path!=='/' ? path.split('/').slice(0,-1).join('/')||'/' : null;
-    const parentHtml = parentPath ? `<div class="file-item" data-nav-path="${parentPath}"><span class="file-icon">⬅️</span><span class="file-name">..</span></div>` : '';
-    const filesHtml = data.files.map(f => {
-      const fp = (path==='/'?'':path)+'/'+f.name;
-      return f.type==='dir'
-        ? `<div class="file-item" data-nav-path="${fp}"><span class="file-icon">📁</span><span class="file-name">${f.name}</span><span class="file-size"></span></div>`
-        : `<div class="file-item" data-open-file="${fp}"><span class="file-icon">${getFileIcon(f.name)}</span><span class="file-name">${f.name}</span><span class="file-size">${fmtBytes(f.size)}</span></div>`;
+    const parentPath = path !== '/' ? path.split('/').slice(0,-1).join('/') || '/' : null;
+
+    let html = `<div class="file-tree-header">📁 ${path}</div>`;
+
+    if (parentPath !== null) {
+      html += `<div class="file-item" data-nav-path="${parentPath}">
+        <span class="file-icon">⬅️</span><span class="file-name">..</span>
+      </div>`;
+    }
+
+    html += data.files.map(f => {
+      const fp = (path === '/' ? '' : path) + '/' + f.name;
+      const isDir = f.type === 'dir';
+      return `<div class="file-item ${isDir ? 'is-dir' : ''}"
+                   ${isDir ? `data-nav-path="${fp}"` : `data-open-file="${fp}"`}
+                   data-file-path="${fp}" data-file-name="${f.name}" data-file-type="${f.type}">
+        <span class="file-icon">${isDir ? '📁' : getFileIcon(f.name)}</span>
+        <span class="file-name">${f.name}</span>
+        <span class="file-size">${f.type === 'file' ? fmtBytes(f.size) : ''}</span>
+        <button class="file-menu-btn" data-menu-for="${fp}" title="More actions">⋮</button>
+      </div>`;
     }).join('');
-    tree.innerHTML = `<div class="file-tree-header">📁 ${path}</div>${parentHtml}${filesHtml}`;
-    // Event delegation — no inline onclick
+
+    tree.innerHTML = html;
+
+    // Event delegation for file tree
     tree.addEventListener('click', e => {
+      // ⋮ menu button
+      const menuBtn = e.target.closest('.file-menu-btn');
+      if (menuBtn) {
+        e.stopPropagation();
+        const item = menuBtn.closest('.file-item');
+        showCtxMenu(e.clientX, e.clientY, {
+          path: item.dataset.filePath,
+          type: item.dataset.fileType,
+          name: item.dataset.fileName,
+        });
+        return;
+      }
+      // Navigate or open
       const item = e.target.closest('[data-nav-path],[data-open-file]');
       if (!item) return;
       if (item.dataset.navPath !== undefined) loadFileTree(item.dataset.navPath);
       else if (item.dataset.openFile !== undefined) openFile(item.dataset.openFile);
     }, { once: true });
-  } catch(err) { tree.innerHTML=`<div style="padding:16px;color:var(--danger);font-size:13px">Error: ${err.message}</div>`; }
+
+    // Right-click context menu on file items
+    tree.addEventListener('contextmenu', e => {
+      const item = e.target.closest('[data-file-path]');
+      if (!item) return;
+      e.preventDefault();
+      showCtxMenu(e.clientX, e.clientY, {
+        path: item.dataset.filePath,
+        type: item.dataset.fileType,
+        name: item.dataset.fileName,
+      });
+    }, { once: true });
+
+  } catch(err) {
+    tree.innerHTML = `<div style="padding:16px;color:var(--danger);font-size:13px">Error: ${err.message}</div>`;
+  }
 }
 
 function getFileIcon(n) {
   const ext=n.split('.').pop().toLowerCase();
-  return ({js:'🟨',ts:'🔷',py:'🐍',java:'☕',json:'📋',md:'📝',sh:'🔧',env:'🔒',txt:'📄',log:'📋',jar:'☕',html:'🌐',css:'🎨',xml:'📄',yml:'⚙️',yaml:'⚙️',zip:'📦',dockerfile:'🐳'})[ext]||'📄';
+  return ({js:'🟨',ts:'🔷',py:'🐍',java:'☕',json:'📋',md:'📝',sh:'🔧',env:'🔒',txt:'📄',log:'📋',jar:'☕',html:'🌐',css:'🎨',xml:'📄',yml:'⚙️',yaml:'⚙️',zip:'📦',tar:'📦',gz:'📦',dockerfile:'🐳'})[ext]||'📄';
 }
 
 async function openFile(fp) {
@@ -779,9 +922,8 @@ document.getElementById('btn-save-file').addEventListener('click', async()=>{
   catch(err) { toast(err.message,'error'); }
 });
 document.getElementById('btn-delete-file').addEventListener('click', async()=>{
-  if(!curAppId||!curFile||!confirm(`Delete ${curFile}?`)) return;
-  try { await api(`/files/${curAppId}/delete?path=${encodeURIComponent(curFile)}`,'DELETE'); toast('Deleted!','success'); document.getElementById('file-content').value=''; curFile=null; loadFileTree(curPath); }
-  catch(err) { toast(err.message,'error'); }
+  if(!curAppId||!curFile) return;
+  await handleFileAction('delete', { path: curFile, type: 'file', name: curFile.split('/').pop() });
 });
 document.getElementById('btn-download-file').addEventListener('click', ()=>{
   if(curAppId&&curFile) window.open(`/api/files/${curAppId}/download?path=${encodeURIComponent(curFile)}`);

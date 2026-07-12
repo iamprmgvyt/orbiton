@@ -1,11 +1,14 @@
 // ============================================================
 // File Manager Routes - Browse, Upload, Download, Edit, Delete
+// Rename, Move, Archive (.zip/.tar.gz), Extract
 // ============================================================
 const express  = require('express');
 const multer   = require('multer');
 const path     = require('path');
 const fs       = require('fs');
 const archiver = require('archiver');
+const unzipper = require('unzipper');
+const tar      = require('tar');
 const mime     = require('mime-types');
 const { db, DATA_DIR } = require('../db/database');
 const router   = express.Router();
@@ -141,13 +144,102 @@ router.post('/:appId/mkdir', (req, res) => {
   }
 });
 
-// POST /api/files/:appId/rename
+// POST /api/files/:appId/rename  { from, to }
 router.post('/:appId/rename', (req, res) => {
   if (!checkAppAccess(req, res)) return;
   try {
     const from = safePath(req.params.appId, req.body.from);
     const to   = safePath(req.params.appId, req.body.to);
+    if (!fs.existsSync(from)) return res.status(404).json({ error: 'Source not found' });
+    if (fs.existsSync(to))    return res.status(409).json({ error: 'Destination already exists' });
     fs.renameSync(from, to);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/files/:appId/move  { from, to }
+router.post('/:appId/move', (req, res) => {
+  if (!checkAppAccess(req, res)) return;
+  try {
+    const from = safePath(req.params.appId, req.body.from);
+    const to   = safePath(req.params.appId, req.body.to);
+    if (!fs.existsSync(from)) return res.status(404).json({ error: 'Source not found' });
+    const toDir = path.dirname(to);
+    if (!fs.existsSync(toDir)) fs.mkdirSync(toDir, { recursive: true });
+    fs.renameSync(from, to);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/files/:appId/archive  { path, format: 'zip'|'tar.gz', destName }
+router.post('/:appId/archive', async (req, res) => {
+  if (!checkAppAccess(req, res)) return;
+  try {
+    const { path: srcPath, format = 'zip', destName } = req.body;
+    if (!srcPath) return res.status(400).json({ error: 'path required' });
+    const src  = safePath(req.params.appId, srcPath);
+    if (!fs.existsSync(src)) return res.status(404).json({ error: 'Source not found' });
+
+    const baseName = destName || path.basename(src);
+    const ext      = format === 'tar.gz' ? '.tar.gz' : '.zip';
+    const destPath = srcPath.split('/').slice(0, -1).join('/') || '/';
+    const destFile = safePath(req.params.appId, `${destPath}/${baseName}${ext}`);
+
+    await new Promise((resolve, reject) => {
+      const output  = fs.createWriteStream(destFile);
+      const archive = archiver(format === 'tar.gz' ? 'tar' : 'zip', {
+        gzip:  format === 'tar.gz',
+        zlib:  { level: 6 },
+      });
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+
+      const stat = fs.statSync(src);
+      if (stat.isDirectory()) {
+        archive.directory(src, path.basename(src));
+      } else {
+        archive.file(src, { name: path.basename(src) });
+      }
+      archive.finalize();
+    });
+
+    res.json({ success: true, file: `${destPath}/${baseName}${ext}` });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/files/:appId/extract  { path, destDir }
+router.post('/:appId/extract', async (req, res) => {
+  if (!checkAppAccess(req, res)) return;
+  try {
+    const { path: srcPath, destDir } = req.body;
+    if (!srcPath) return res.status(400).json({ error: 'path required' });
+    const src  = safePath(req.params.appId, srcPath);
+    if (!fs.existsSync(src)) return res.status(404).json({ error: 'Archive not found' });
+
+    const srcName = path.basename(srcPath);
+    const outPath = destDir
+      ? safePath(req.params.appId, destDir)
+      : safePath(req.params.appId, srcPath.split('/').slice(0, -1).join('/') || '/');
+
+    if (!fs.existsSync(outPath)) fs.mkdirSync(outPath, { recursive: true });
+
+    if (srcName.endsWith('.tar.gz') || srcName.endsWith('.tgz')) {
+      await tar.x({ file: src, cwd: outPath });
+    } else if (srcName.endsWith('.zip')) {
+      await fs.createReadStream(src)
+        .pipe(unzipper.Extract({ path: outPath }))
+        .promise();
+    } else {
+      return res.status(400).json({ error: 'Unsupported format. Use .zip or .tar.gz' });
+    }
+
     res.json({ success: true });
   } catch (err) {
     res.status(400).json({ error: err.message });

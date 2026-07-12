@@ -183,6 +183,19 @@
       <input type="file" id="upload-input" multiple style="display:none" />
     </div>
 
+    <!-- ═══ CONTEXT MENU (File Manager) ══════════════════════ -->
+    <div id="file-ctx-menu" style="display:none;position:fixed;z-index:9999;min-width:180px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:6px;box-shadow:0 8px 32px rgba(0,0,0,0.4);backdrop-filter:blur(20px)">
+      <div class="ctx-item" data-ctx="rename">✏️ Rename</div>
+      <div class="ctx-item" data-ctx="move">📂 Move to...</div>
+      <div class="ctx-item ctx-archive" data-ctx="archive-zip">🗜️ Archive as .zip</div>
+      <div class="ctx-item ctx-archive" data-ctx="archive-targz">🗜️ Archive as .tar.gz</div>
+      <div class="ctx-item ctx-extract" data-ctx="extract" style="display:none">📦 Extract here</div>
+      <div class="ctx-divider"></div>
+      <div class="ctx-item" data-ctx="download">⬇️ Download</div>
+      <div class="ctx-divider"></div>
+      <div class="ctx-item ctx-danger" data-ctx="delete">🗑️ Delete</div>
+    </div>
+
     <!-- ═══ TERMINAL ══════════════════════════════════════════ -->
     <div class="page" id="page-terminal">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
