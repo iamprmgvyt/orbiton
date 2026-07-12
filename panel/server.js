@@ -26,7 +26,7 @@ const app = express();
 // ─── Configuration ────────────────────────────────────────────
 const PORT     = parseInt(process.env.PORT     || '3000');
 const SSL_PORT = parseInt(process.env.SSL_PORT || '3443');
-const FRONTEND = path.join(__dirname, '..', 'frontend', 'dist');
+const FRONTEND = path.join(__dirname, 'dist');
 
 // Certs: look in ./certs/ relative to project root
 const CERT_DIR  = path.join(__dirname, '..', 'certs');
