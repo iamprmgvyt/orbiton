@@ -84,7 +84,7 @@ const TITLES   = {
   settings:  ['Settings','Panel configuration'],
 };
 
-function showPage(pageId) {
+function showPage(pageId, pushUrl = true) {
   pages.forEach(p => p.classList.remove('active'));
   navItems.forEach(n => n.classList.remove('active'));
   const page = document.getElementById(`page-${pageId}`);
@@ -93,6 +93,7 @@ function showPage(pageId) {
   if (nav)  nav.classList.add('active');
   const [title, sub] = TITLES[pageId] || [pageId,''];
   document.getElementById('topbar-title').innerHTML = `${title} <span>${sub}</span>`;
+  if (pushUrl && pageId !== 'app-detail') history.pushState({ page: pageId }, '', '/dashboard');
   if (pageId === 'dashboard') loadDashboard();
   else if (pageId === 'apps')     loadApps();
   else if (pageId === 'monitor')  loadMonitor();
@@ -107,9 +108,29 @@ document.getElementById('sidebar-toggle').addEventListener('click', () =>
   document.getElementById('sidebar').classList.toggle('open'));
 document.getElementById('btn-refresh').addEventListener('click', () => {
   const active = document.querySelector('.page.active');
-  if (active) showPage(active.id.replace('page-',''));
+  if (active) showPage(active.id.replace('page-',''), false);
   toast('Refreshed','success',2000);
 });
+
+// ─── Browser back/forward navigation ─────────────────────────
+window.addEventListener('popstate', e => {
+  const s = e.state;
+  if (!s) return;
+  if (s.page === 'server') openAppDetail(s.appId, s.tab, false);
+  else showPage(s.page || 'dashboard', false);
+});
+
+// ─── Initial URL routing (Pterodactyl-style) ──────────────────
+function handleInitialRoute() {
+  const path = window.location.pathname;
+  const m = path.match(/^\/server\/([^/]+)(?:\/(console|files|logs|info))?$/);
+  if (m) {
+    const [, appId, tab] = m;
+    setTimeout(() => openAppDetail(appId, tab || 'logs', false), 200);
+  } else {
+    history.replaceState({ page: 'dashboard' }, '', '/dashboard');
+  }
+}
 
 // ─── Socket.IO ────────────────────────────────────────────────
 const socket = io({ auth: { token } });
@@ -118,12 +139,11 @@ socket.on('app:status', ({ appId, status }) => {
     el.className = `status-badge ${status}`;
     el.innerHTML = `<span class="status-dot"></span>${status}`;
   });
-  updateAppCardActions(appId, status);
+  // Re-render action buttons on status change
+  document.querySelectorAll(`[data-app-id="${appId}"] .app-actions`).forEach(el => {
+    el.innerHTML = appActionButtons(appId, status);
+  });
 });
-function updateAppCardActions(appId, status) {
-  const el = document.querySelector(`[data-app-id="${appId}"] .app-actions`);
-  if (el) { el.innerHTML = appActionButtons(appId, status); bindAppActionBtns(el, appId); }
-}
 
 // ─── CREATE/EDIT APP MODAL ────────────────────────────────────
 const modalApp = document.getElementById('modal-app');
@@ -416,9 +436,6 @@ function renderDashboardApps(apps) {
         <td><div class="app-actions" style="flex-wrap:nowrap">${appActionButtons(a.id,a.liveStatus)}</div></td>
       </tr>`).join('')}
     </tbody></table></div>`;
-  document.querySelectorAll('#dashboard-apps-list [data-app-id]').forEach(row => {
-    bindAppActionBtns(row.querySelector('.app-actions'), row.dataset.appId);
-  });
 }
 
 // ─── APPS PAGE ────────────────────────────────────────────────
@@ -437,15 +454,6 @@ async function loadApps() {
       return;
     }
     grid.innerHTML = apps.map(a => appCard(a)).join('');
-    apps.forEach(a => {
-      const card = document.querySelector(`[data-app-id="${a.id}"]`);
-      if (!card) return;
-      bindAppActionBtns(card.querySelector('.app-actions'), a.id);
-      card.addEventListener('click', e => {
-        if (e.target.closest('.btn')) return;
-        openAppDetail(a.id);
-      });
-    });
   } catch (err) { toast('Error: '+err.message,'error'); }
 }
 
@@ -478,44 +486,41 @@ function appActionButtons(appId, status) {
     <button class="btn btn-danger btn-sm" data-action="delete">🗑️</button>`;
 }
 
-function bindAppActionBtns(container, appId) {
-  if (!container) return;
-  container.querySelectorAll('[data-action]').forEach(btn => {
-    btn.addEventListener('click', async e => {
-      e.stopPropagation();
-      const a = btn.dataset.action;
-      if (a === 'start')   await appAction(appId,'start');
-      if (a === 'stop')    await appAction(appId,'stop');
-      if (a === 'restart') await appAction(appId,'restart');
-      if (a === 'console') openAppDetail(appId,'console');
-      if (a === 'edit')    openEditApp(appId);
-      if (a === 'delete')  deleteApp(appId);
-    });
-  });
+async function handleAppButtonClick(appId, action) {
+  if (action === 'start')   await appAction(appId, 'start');
+  if (action === 'stop')    await appAction(appId, 'stop');
+  if (action === 'restart') await appAction(appId, 'restart');
+  if (action === 'console') openAppDetail(appId, 'console');
+  if (action === 'edit')    openEditApp(appId);
+  if (action === 'delete')  deleteApp(appId);
 }
 
-window.appAction = async function(appId, action) {
+async function appAction(appId, action) {
   try {
     await api(`/apps/${appId}/${action}`, 'POST');
-    toast(`App ${action}ed!`,'success');
+    toast(`App ${action}ed!`, 'success');
     setTimeout(() => { loadApps(); loadDashboard(); }, 800);
-  } catch (err) { toast(err.message,'error'); }
+  } catch (err) { toast(err.message, 'error'); }
 }
 
-window.openEditApp = async function(appId) {
-  try { openAppModal(await api(`/apps/${appId}`)); } catch (err) { toast(err.message,'error'); }
+async function openEditApp(appId) {
+  try { openAppModal(await api(`/apps/${appId}`)); } catch (err) { toast(err.message, 'error'); }
 }
 
-window.deleteApp = async function(appId) {
+async function deleteApp(appId) {
   if (!confirm('Delete this application and all its files? This cannot be undone.')) return;
-  try { await api(`/apps/${appId}`,'DELETE'); toast('App deleted','success'); loadApps(); loadDashboard(); }
-  catch (err) { toast(err.message,'error'); }
+  try { await api(`/apps/${appId}`, 'DELETE'); toast('App deleted', 'success'); loadApps(); loadDashboard(); }
+  catch (err) { toast(err.message, 'error'); }
 }
+
 
 // ─── APP DETAIL ───────────────────────────────────────────────
-async function openAppDetail(appId, tab = 'logs') {
-  showPage('app-detail');
+async function openAppDetail(appId, tab = 'logs', pushUrl = true) {
+  showPage('app-detail', false);
   document.getElementById('nav-apps').classList.add('active');
+  if (pushUrl) history.pushState({ page: 'server', appId, tab }, '', `/server/${appId}/${tab}`);
+  // Update topbar
+  document.getElementById('topbar-title').innerHTML = `Server <span>${appId.slice(0,8)}</span>`;
   const content = document.getElementById('app-detail-content');
   content.innerHTML = '<div class="spinner" style="margin-top:40px"></div>';
   try {
@@ -523,14 +528,16 @@ async function openAppDetail(appId, tab = 'logs') {
       api(`/apps/${appId}`),
       api(`/apps/${appId}/logs?lines=300`),
     ]);
-    renderAppDetail(app, logsData.logs || []);
+    // Update topbar with real name
+    document.getElementById('topbar-title').innerHTML = `${app.name} <span>Server Management</span>`;
+    renderAppDetail(app, logsData.logs || [], tab);
     if (tab === 'console') setTimeout(() => initAppTerminal(appId), 100);
   } catch (err) {
     content.innerHTML = `<div class="empty-state"><div class="empty-title">Error: ${err.message}</div></div>`;
   }
 }
 
-function renderAppDetail(app, logs) {
+function renderAppDetail(app, logs, initialTab = 'logs') {
   const content = document.getElementById('app-detail-content');
   content.innerHTML = `
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
@@ -600,7 +607,7 @@ function renderAppDetail(app, logs) {
     await appAction(app.id, action);
   });
 
-  // Detail tabs — event delegation
+  // Detail tabs — event delegation, update URL on switch
   document.getElementById('detail-tabs').addEventListener('click', e => {
     const btn = e.target.closest('[data-tab]');
     if (!btn) return;
@@ -611,11 +618,19 @@ function renderAppDetail(app, logs) {
     });
     document.querySelectorAll('#detail-tabs .btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    // Update URL
+    history.replaceState({ page: 'server', appId: app.id, tab }, '', `/server/${app.id}/${tab}`);
     if (tab === 'terminal') {
       const xt = document.querySelector('[id^="detail-xterm-"]');
       if (xt) initAppTerminal(xt.id.replace('detail-xterm-',''));
     }
   });
+
+  // Activate initial tab
+  if (initialTab && initialTab !== 'logs') {
+    const tabBtn = document.querySelector(`#detail-tabs [data-tab="${initialTab}"]`);
+    if (tabBtn) tabBtn.click();
+  }
 
   // stdin send button
   content.querySelector('#btn-send-stdin').addEventListener('click', async () => {
@@ -648,7 +663,8 @@ function renderAppDetail(app, logs) {
 
 document.getElementById('btn-back-apps').addEventListener('click', () => {
   socket.emit('app:unsubscribe',{});
-  showPage('apps');
+  history.pushState({ page: 'apps' }, '', '/dashboard');
+  showPage('apps', false);
 });
 
 // ─── App Terminal (in detail page) ───────────────────────────
@@ -1062,5 +1078,30 @@ document.getElementById('change-pass-form').addEventListener('submit',async e=>{
   catch(err){toast(err.message,'error');}
 });
 
+// ─── GLOBAL EVENT DELEGATORS ──────────────────────────────────
+document.getElementById('apps-grid').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (btn) {
+    e.stopPropagation();
+    const card = btn.closest('[data-app-id]');
+    if (card) handleAppButtonClick(card.dataset.appId, btn.dataset.action);
+    return;
+  }
+  const card = e.target.closest('[data-app-id]');
+  if (card && !e.target.closest('.btn')) {
+    openAppDetail(card.dataset.appId);
+  }
+});
+
+document.getElementById('dashboard-apps-list').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-action]');
+  if (btn) {
+    e.stopPropagation();
+    const row = btn.closest('[data-app-id]');
+    if (row) handleAppButtonClick(row.dataset.appId, btn.dataset.action);
+  }
+});
+
 // ─── Init ─────────────────────────────────────────────────────
 loadDashboard();
+handleInitialRoute();

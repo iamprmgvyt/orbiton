@@ -61,9 +61,8 @@ app.use('/api/system', authMiddleware, systemRoutes);
 
 // Catch-all → serve frontend SPA
 app.get('*', (req, res) => {
-  const file = req.path.startsWith('/dashboard')
-    ? 'dashboard.html'
-    : 'index.html';
+  const isDashboard = req.path.startsWith('/dashboard') || req.path.startsWith('/server');
+  const file = isDashboard ? 'dashboard.html' : 'index.html';
   res.sendFile(path.join(FRONTEND, file));
 });
 

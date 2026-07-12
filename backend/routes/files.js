@@ -233,9 +233,12 @@ router.post('/:appId/extract', async (req, res) => {
     if (srcName.endsWith('.tar.gz') || srcName.endsWith('.tgz')) {
       await tar.x({ file: src, cwd: outPath });
     } else if (srcName.endsWith('.zip')) {
-      await fs.createReadStream(src)
-        .pipe(unzipper.Extract({ path: outPath }))
-        .promise();
+      await new Promise((resolve, reject) => {
+        fs.createReadStream(src)
+          .pipe(unzipper.Extract({ path: outPath }))
+          .on('close', resolve)
+          .on('error', reject);
+      });
     } else {
       return res.status(400).json({ error: 'Unsupported format. Use .zip or .tar.gz' });
     }
