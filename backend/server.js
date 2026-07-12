@@ -36,6 +36,8 @@ const CERT_DIR  = path.join(__dirname, '..', 'certs');
 const CERT_FILE = path.join(CERT_DIR, 'fullchain.pem');
 const KEY_FILE  = path.join(CERT_DIR, 'privkey.pem');
 
+app.set('trust proxy', 1); // Trust reverse proxy (Nginx, Codespace, etc.)
+
 app.use(helmet({
   contentSecurityPolicy: false,
 }));
