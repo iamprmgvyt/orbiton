@@ -41,59 +41,54 @@ Lightweight, self-hosted panel to manage any application — Node.js, Python, Ja
 
 ---
 
-## 📦 Installation
+## 📦 Installation & Setup
 
-### Method 1: Docker (Easiest)
-
-```bash
-# Clone
-git clone https://github.com/iamprmgvyt/orbiton.git
-cd orbiton
-
-# Run with Docker Compose
-docker compose up -d
-
-# Access: http://localhost:3000
-```
-
-### Method 2: Auto-Install (Ubuntu 24 LTS)
+### Method 1: Interactive Auto-Installer (Recommended for VPS Ubuntu 22/24 LTS)
 
 ```bash
 git clone https://github.com/iamprmgvyt/orbiton.git
 cd orbiton
 sudo bash install.sh
 ```
-
-Automatically installs: Node.js, Python 3, Java 21, Docker, SSL certs, and systemd service.
-
-### Method 3: Manual (Any OS)
-
-```bash
-# Prerequisites: Node.js 18+, git
-git clone https://github.com/iamprmgvyt/orbiton.git
-cd orbiton/backend
-npm install
-
-# (Optional) Generate SSL cert
-cd .. && bash generate-cert.sh   # Linux/macOS
-# Or: openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/fullchain.pem -subj "/CN=localhost"
-
-# Start
-node backend/server.js
-```
-
-> **Windows**: Works out of the box. Terminal uses PowerShell automatically.
+This interactive script allows you to choose to install **both Panel & Daemon** on the same machine, **Panel only**, or **Daemon only**. It handles dependencies (Node.js, Docker, Java, Python), firewall rules, and registers systemd services automatically.
 
 ---
 
-## 🔐 Login
+### Method 2: Manual Setup & GitHub Codespaces (For local development/testing)
 
-| URL | Default |
-|-----|---------|
-| `http://localhost:3000` | `admin` / `admin123` |
-| `https://localhost:3443` | (after SSL setup) |
+> [!NOTE]
+> Codespaces will only auto-forward ports if you start the server processes **directly in your terminal** instead of running background systemd services.
 
-> ⚠️ **Change the default password immediately after first login!**
+Follow these steps in separate terminals:
+
+#### 1. Start the Node Agent (Daemon)
+```bash
+cd orbiton/daemon
+npm install
+node server.js
+```
+*Daemon runs on port `8080` by default.*
+
+#### 2. Start the Central Web Panel
+```bash
+cd orbiton/panel
+npm install
+node server.js
+```
+*Panel runs on port `3000` by default. Codespaces will automatically popup a notification to forward ports `3000` and `8080`. Click to open port `3000` in browser.*
+
+---
+
+## 🔐 Credentials & Ports
+
+| Component | Default Port | Default Login |
+|-----------|--------------|---------------|
+| **Web Panel** | `3000` (HTTP) / `3443` (HTTPS) | Username: `admin` <br> Password: `admin123` |
+| **Daemon Node** | `8080` (HTTP) | Secure Token: check `.env` (`DAEMON_TOKEN`) |
+
+> [!IMPORTANT]
+> Change the default password immediately in settings after logging in!
+
 
 ---
 
