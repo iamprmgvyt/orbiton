@@ -59,23 +59,31 @@ This interactive script allows you to choose to install **both Panel & Daemon** 
 > [!NOTE]
 > Codespaces will only auto-forward ports if you start the server processes **directly in your terminal** instead of running background systemd services.
 
-Follow these steps in separate terminals:
-
-#### 1. Start the Node Agent (Daemon)
+#### Option A: Run both Panel & Daemon in the background (Fastest, single terminal)
+Open your terminal in the workspace root and paste:
 ```bash
-cd orbiton/daemon
-npm install
-node server.js
-```
-*Daemon runs on port `8080` by default.*
+# 1. Setup default configurations and install dependencies
+cd daemon && cp -f .env.example .env && npm install
+cd ../panel && cp -f .env.example .env && npm install
 
-#### 2. Start the Central Web Panel
-```bash
-cd orbiton/panel
-npm install
-node server.js
+# 2. Spin up processes in background
+node ../daemon/server.js > ../daemon.log 2>&1 &
+node server.js > ../panel.log 2>&1 &
+
+echo "🪐 Orbiton Panel (3000) and Daemon (8080) are running in background!"
 ```
-*Panel runs on port `3000` by default. Codespaces will automatically popup a notification to forward ports `3000` and `8080`. Click to open port `3000` in browser.*
+- To view Node Agent logs: `tail -f ../daemon.log`
+- To view Web Panel logs: `tail -f ../panel.log`
+
+#### Option B: Run in separate terminals (For debugging)
+- **Terminal 1 (Daemon Node):**
+  ```bash
+  cd orbiton/daemon && cp -f .env.example .env && npm install && node server.js
+  ```
+- **Terminal 2 (Web Panel):**
+  ```bash
+  cd orbiton/panel && cp -f .env.example .env && npm install && node server.js
+  ```
 
 ---
 
@@ -83,11 +91,9 @@ node server.js
 
 | Component | Default Port | Default Login |
 |-----------|--------------|---------------|
-| **Web Panel** | `3000` (HTTP) / `3443` (HTTPS) | Username: `admin` <br> Password: `admin123` |
+| **Web Panel** | `3000` (HTTP) / `3443` (HTTPS) | Set up your own custom administrator account on first access! (Interactive setup page will appear automatically) |
 | **Daemon Node** | `8080` (HTTP) | Secure Token: check `.env` (`DAEMON_TOKEN`) |
 
-> [!IMPORTANT]
-> Change the default password immediately in settings after logging in!
 
 
 ---
