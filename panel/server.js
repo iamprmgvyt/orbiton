@@ -1,7 +1,6 @@
 // ============================================================
-// Orbiton - Universal App & Server Manager
-// Main Server Entry Point
-// Cross-platform: Windows, macOS, Linux
+// Orbiton Panel - Main Server Entry Point
+// Central API and Web Router serving compiled React frontend.
 // ============================================================
 require('dotenv').config();
 const express  = require('express');
@@ -10,7 +9,6 @@ const https    = require('https');
 const { Server } = require('socket.io');
 const fs       = require('fs');
 const path     = require('path');
-const os       = require('os');
 const cors     = require('cors');
 const helmet   = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -21,7 +19,6 @@ const appsRoutes   = require('./routes/apps');
 const fileRoutes   = require('./routes/files');
 const systemRoutes = require('./routes/system');
 const { setupSocketHandlers } = require('./managers/terminalManager');
-const processManager = require('./managers/processManager');
 const authMiddleware = require('./middleware/auth');
 
 const app = express();
@@ -29,14 +26,14 @@ const app = express();
 // ─── Configuration ────────────────────────────────────────────
 const PORT     = parseInt(process.env.PORT     || '3000');
 const SSL_PORT = parseInt(process.env.SSL_PORT || '3443');
-const FRONTEND = path.join(__dirname, '..', 'frontend');
+const FRONTEND = path.join(__dirname, '..', 'frontend', 'dist');
 
 // Certs: look in ./certs/ relative to project root
 const CERT_DIR  = path.join(__dirname, '..', 'certs');
 const CERT_FILE = path.join(CERT_DIR, 'fullchain.pem');
 const KEY_FILE  = path.join(CERT_DIR, 'privkey.pem');
 
-app.set('trust proxy', 1); // Trust reverse proxy (Nginx, Codespace, etc.)
+app.set('trust proxy', 1);
 
 app.use(helmet({
   contentSecurityPolicy: false,
@@ -59,11 +56,9 @@ app.use('/api/apps',   authMiddleware, appsRoutes);
 app.use('/api/files',  authMiddleware, fileRoutes);
 app.use('/api/system', authMiddleware, systemRoutes);
 
-// Catch-all → serve frontend SPA
+// Catch-all → serve React frontend SPA index.html
 app.get('*', (req, res) => {
-  const isDashboard = req.path.startsWith('/dashboard') || req.path.startsWith('/server');
-  const file = isDashboard ? 'dashboard.html' : 'index.html';
-  res.sendFile(path.join(FRONTEND, file));
+  res.sendFile(path.join(FRONTEND, 'index.html'));
 });
 
 // ─── Init DB ──────────────────────────────────────────────────
@@ -84,10 +79,9 @@ if (hasSSL) {
   const httpsServer = https.createServer(sslOpts, app);
   io = new Server(httpsServer, ioOptions);
   setupSocketHandlers(io);
-  processManager.setIO(io);
 
   httpsServer.listen(SSL_PORT, () =>
-    console.log(`🔒 Orbiton HTTPS → https://localhost:${SSL_PORT}`));
+    console.log(`🔒 Orbiton Panel HTTPS → https://localhost:${SSL_PORT}`));
 
   // Redirect HTTP → HTTPS
   http.createServer((req, res) => {
@@ -101,37 +95,11 @@ if (hasSSL) {
 } else {
   io = new Server(httpServer, ioOptions);
   setupSocketHandlers(io);
-  processManager.setIO(io);
 
-  httpServer.listen(PORT, () => {
-    console.log(`\n🌐 Orbiton is running!`);
-    console.log(`   Local:   http://localhost:${PORT}`);
-    console.log(`   Network: http://${getLocalIP()}:${PORT}`);
-    console.log(`   ⚠  No SSL certs. Run: bash generate-cert.sh\n`);
-  });
+  httpServer.listen(PORT, () =>
+    console.log(`🪐 Orbiton Panel HTTP → http://localhost:${PORT}`));
 
   primaryServer = httpServer;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────
-function getLocalIP() {
-  const ifaces = os.networkInterfaces();
-  for (const dev of Object.values(ifaces)) {
-    for (const info of dev) {
-      if (info.family === 'IPv4' && !info.internal) return info.address;
-    }
-  }
-  return 'localhost';
-}
-
-// ─── Graceful Shutdown ────────────────────────────────────────
-const shutdown = () => {
-  console.log('\n⏹  Shutting down Orbiton...');
-  processManager.stopAll();
-  primaryServer.close(() => { console.log('✅ Done.'); process.exit(0); });
-  setTimeout(() => process.exit(1), 10000);
-};
-process.on('SIGTERM', shutdown);
-process.on('SIGINT',  shutdown);
-
-module.exports = { app, io };
+module.exports = { app, server: primaryServer };

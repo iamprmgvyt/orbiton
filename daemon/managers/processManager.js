@@ -1,0 +1,267 @@
+// ============================================================
+// Orbiton Daemon - Process Manager (Cross-platform)
+// Manages application processes locally without database.
+// ============================================================
+const { spawn, exec } = require('child_process');
+const path = require('path');
+const fs   = require('fs');
+
+const MAX_LOG_LINES = 500;
+const IS_WIN        = process.platform === 'win32';
+
+// In-memory: appId → { process, logs[], status, pid, startedAt, config }
+const processes = new Map();
+let ioInstance = null;
+
+// Set data directory (normally passed from server.js environment)
+const DATA_DIR = process.env.DATA_DIR || '/opt/orbiton-data';
+const APPS_DIR = path.join(DATA_DIR, 'apps');
+
+function setIO(io) { ioInstance = io; }
+
+function emit(event, data) {
+  if (ioInstance) ioInstance.emit(event, data);
+}
+
+function getAppDir(appId) {
+  const dir = path.join(APPS_DIR, appId);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// ─── Start App ────────────────────────────────────────────────
+function startApp(appId, appConfig) {
+  const existing = processes.get(appId);
+  if (existing?.status === 'running') {
+    throw new Error('Application is already running');
+  }
+
+  const workDir = getAppDir(appId);
+  if (!fs.existsSync(workDir)) fs.mkdirSync(workDir, { recursive: true });
+
+  let envVars = {};
+  if (appConfig.env_vars) {
+    envVars = typeof appConfig.env_vars === 'string' 
+      ? JSON.parse(appConfig.env_vars || '{}') 
+      : appConfig.env_vars;
+  }
+
+  const env = {
+    ...process.env,
+    ...envVars,
+    APP_ID:   appId,
+    APP_NAME: appConfig.name,
+  };
+
+  const cmdStr = appConfig.start_cmd.trim();
+  updateStatus(appId, 'starting');
+
+  const proc = spawn(cmdStr, [], {
+    cwd:   workDir,
+    env,
+    shell: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  });
+
+  const entry = {
+    pid:       proc.pid,
+    status:    'running',
+    logs:      [],
+    process:   proc,
+    startedAt: new Date().toISOString(),
+    config:    appConfig
+  };
+  processes.set(appId, entry);
+  updateStatus(appId, 'running');
+
+  proc.stdout.on('data', (data) => appendLog(appId, data.toString()));
+  proc.stderr.on('data', (data) => appendLog(appId, `\x1b[31m${data.toString()}\x1b[0m`));
+
+  proc.on('close', (code) => {
+    appendLog(appId, `\x1b[33m[Orbiton] Process exited (code ${code})\x1b[0m\n`);
+    if (processes.has(appId)) processes.get(appId).status = 'stopped';
+    updateStatus(appId, 'stopped');
+
+    // Auto-restart
+    if (appConfig.auto_restart && code !== 0) {
+      appendLog(appId, `\x1b[33m[Orbiton] Auto-restarting in 5s...\x1b[0m\n`);
+      setTimeout(() => { 
+        try { 
+          const current = processes.get(appId);
+          if (current && current.status !== 'running') {
+            startApp(appId, appConfig); 
+          }
+        } catch (_) {} 
+      }, 5000);
+    }
+  });
+
+  proc.on('error', (err) => {
+    appendLog(appId, `\x1b[31m[Orbiton Error] ${err.message}\x1b[0m\n`);
+    updateStatus(appId, 'error');
+  });
+
+  return { pid: proc.pid };
+}
+
+// ─── Stop App ─────────────────────────────────────────────────
+function stopApp(appId, signal = null) {
+  const entry = processes.get(appId);
+  if (!entry || entry.status !== 'running') throw new Error('Application is not running');
+
+  if (IS_WIN) {
+    if (signal === 'SIGKILL') {
+      exec(`taskkill /PID ${entry.pid} /T /F`, () => {});
+    } else {
+      entry.process.kill();
+    }
+  } else {
+    entry.process.kill(signal || 'SIGTERM');
+  }
+
+  updateStatus(appId, 'stopping');
+}
+
+// ─── Restart ──────────────────────────────────────────────────
+async function restartApp(appId, appConfig) {
+  const entry = processes.get(appId);
+  if (entry?.status === 'running') {
+    stopApp(appId);
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  return startApp(appId, appConfig || entry?.config);
+}
+
+// ─── Kill (force) ─────────────────────────────────────────────
+function killApp(appId) { return stopApp(appId, 'SIGKILL'); }
+
+// ─── Send stdin ───────────────────────────────────────────────
+function sendInput(appId, input) {
+  const entry = processes.get(appId);
+  if (!entry || entry.status !== 'running') throw new Error('Application is not running');
+  entry.process.stdin.write(input + '\n');
+}
+
+// ─── Import from Git ──────────────────────────────────────────
+async function importFromGit(appId, gitUrl, branch = '') {
+  const dir = getAppDir(appId);
+  return new Promise((resolve, reject) => {
+    const branchFlag = branch ? `-b ${branch}` : '';
+    const cmd = `git clone ${branchFlag} "${gitUrl}" .`;
+    appendLog(appId, `\x1b[36m[Orbiton] Cloning: ${gitUrl}\x1b[0m\n`);
+
+    exec(cmd, { cwd: dir, timeout: 120000 }, (err, stdout, stderr) => {
+      if (err) {
+        appendLog(appId, `\x1b[31m[Git Error] ${err.message}\x1b[0m\n`);
+        return reject(err);
+      }
+      appendLog(appId, `\x1b[32m[Orbiton] Clone complete!\x1b[0m\n`);
+      resolve({ success: true });
+    });
+  });
+}
+
+// ─── Import from ZIP ──────────────────────────────────────────
+async function importFromZip(appId, zipPath) {
+  const unzipper = require('unzipper');
+  const dir = getAppDir(appId);
+  appendLog(appId, `\x1b[36m[Orbiton] Extracting ZIP...\x1b[0m\n`);
+
+  await new Promise((resolve, reject) => {
+    fs.createReadStream(zipPath)
+      .pipe(unzipper.Extract({ path: dir }))
+      .on('close', resolve)
+      .on('error', reject);
+  });
+
+  try { fs.unlinkSync(zipPath); } catch (_) {}
+
+  appendLog(appId, `\x1b[32m[Orbiton] ZIP extracted!\x1b[0m\n`);
+  return { success: true };
+}
+
+// ─── Pull Docker Image ────────────────────────────────────────
+async function pullDockerImage(appId, image) {
+  return new Promise((resolve, reject) => {
+    appendLog(appId, `\x1b[36m[Orbiton] Pulling Docker image: ${image}\x1b[0m\n`);
+    exec(`docker pull ${image}`, { timeout: 300000 }, (err, stdout, stderr) => {
+      if (err) {
+        appendLog(appId, `\x1b[31m[Docker Error] ${err.message}\x1b[0m\n`);
+        return reject(err);
+      }
+      appendLog(appId, `\x1b[32m[Orbiton] Image pulled: ${image}\x1b[0m\n`);
+      resolve({ success: true });
+    });
+  });
+}
+
+// ─── Getters ──────────────────────────────────────────────────
+function getAppStatus(appId) {
+  const entry = processes.get(appId);
+  return {
+    status:    entry ? entry.status : 'stopped',
+    pid:       entry?.pid    || null,
+    startedAt: entry?.startedAt || null,
+  };
+}
+
+function getRunningApps() {
+  const result = {};
+  for (const [id, e] of processes) {
+    result[id] = { status: e.status, pid: e.pid, startedAt: e.startedAt };
+  }
+  return result;
+}
+
+function getLogs(appId, lines = 100) {
+  const entry = processes.get(appId);
+  if (entry) return entry.logs.slice(-lines);
+  
+  // Standalone file logs fallback
+  const logFile = path.join(getAppDir(appId), 'console.log');
+  if (fs.existsSync(logFile)) {
+    try {
+      const content = fs.readFileSync(logFile, 'utf8');
+      const allLines = content.split('\n');
+      return allLines.slice(-lines);
+    } catch (_) {}
+  }
+  return [];
+}
+
+function stopAll() {
+  for (const [appId] of processes) {
+    try { stopApp(appId); } catch (_) {}
+  }
+}
+
+// ─── Internals ────────────────────────────────────────────────
+function appendLog(appId, line) {
+  const entry = processes.get(appId);
+  if (entry) {
+    entry.logs.push(line);
+    if (entry.logs.length > MAX_LOG_LINES) entry.logs.shift();
+  }
+  emit('app:log', { appId, line });
+  
+  // Write to console.log in app dir
+  try {
+    const logFile = path.join(getAppDir(appId), 'console.log');
+    fs.appendFileSync(logFile, line);
+  } catch (_) {}
+}
+
+function updateStatus(appId, status) {
+  const entry = processes.get(appId);
+  if (entry) entry.status = status;
+  emit('app:status', { appId, status });
+}
+
+module.exports = {
+  setIO,
+  startApp, stopApp, restartApp, killApp, sendInput,
+  importFromGit, importFromZip, pullDockerImage,
+  getAppStatus, getRunningApps, getLogs, getAppDir,
+  stopAll,
+};

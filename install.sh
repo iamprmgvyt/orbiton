@@ -1,283 +1,296 @@
 #!/bin/bash
 # ============================================================
-# Orbiton - Auto Install Script for Ubuntu 22/24 LTS
+# Orbiton - Interactive CLI Auto Installer (Pterodactyl-Style)
+# Works on Ubuntu 22/24 LTS
 # Run as root: sudo bash install.sh
 # ============================================================
 
 set -e
 
-PANEL_DIR="/opt/orbiton"
+PANEL_DIR="/opt/orbiton-panel"
+DAEMON_DIR="/opt/orbiton-daemon"
 DATA_DIR="/opt/orbiton-data"
-SERVICE_NAME="orbiton"
-PORT=80
-SSL_PORT=443
+LOG_PATH="/var/log/orbiton-installer.log"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; NC='\033[0m'; BOLD='\033[1m'
 
-echo -e "${BLUE}${BOLD}"
-echo "╔══════════════════════════════════════════════╗"
-echo "║         🌐 Orbiton — Auto Installer          ║"
-echo "║         Ubuntu 22/24 LTS                     ║"
-echo "╚══════════════════════════════════════════════╝"
-echo -e "${NC}"
+echo -e "\n\n* orbiton-installer started on $(date) \n\n" >> $LOG_PATH
 
-# Check root
+# ─── Check Root ───────────────────────────────────────────────
 if [ "$EUID" -ne 0 ]; then
   echo -e "${RED}❌ Please run as root: sudo bash install.sh${NC}"
   exit 1
 fi
-echo -e "${GREEN}✔ Running as root${NC}"
 
-# Stop existing services if running to free ports (80/443)
-echo -e "${YELLOW}Stopping any existing panel service to free ports...${NC}"
-systemctl stop orbiton --quiet 2>/dev/null || true
-systemctl stop vps-panel --quiet 2>/dev/null || true
+welcome() {
+  echo -e "${BLUE}${BOLD}"
+  echo "╔══════════════════════════════════════════════╗"
+  echo "║        🪐 Orbiton — CLI Auto Installer       ║"
+  echo "║           Ubuntu 22/24 LTS Support           ║"
+  echo "╚══════════════════════════════════════════════╝"
+  echo -e "${NC}"
+}
 
-# Detect distro
-DISTRO=$(lsb_release -is 2>/dev/null || echo "Unknown")
-CODENAME=$(lsb_release -cs 2>/dev/null || echo "unknown")
-echo -e "${GREEN}✔ OS: ${DISTRO} ${CODENAME}${NC}"
-
-# ─── Helper: install packages, skipping unavailable ones ──────
 safe_apt_install() {
   for pkg in "$@"; do
     if apt-cache show "$pkg" &>/dev/null 2>&1; then
-      apt-get install -y -qq "$pkg" || echo -e "${YELLOW}  ⚠ Could not install ${pkg}, skipping${NC}"
-    else
-      echo -e "${YELLOW}  ⚠ Package ${pkg} not found, skipping${NC}"
+      apt-get install -y -qq "$pkg" >> $LOG_PATH 2>&1 || echo -e "${YELLOW}  ⚠ Skipping ${pkg}${NC}"
     fi
   done
 }
 
-# ─── Update System ─────────────────────────────────────────────
-echo -e "\n${YELLOW}[1/8] Updating system...${NC}"
-apt-get update -qq
-apt-get upgrade -y -qq
+update_system() {
+  echo -e "${YELLOW}Updating package repository...${NC}"
+  apt-get update -qq >> $LOG_PATH 2>&1
+  apt-get install -y -qq curl wget git build-essential unzip ca-certificates gnupg lsb-release >> $LOG_PATH 2>&1
+}
 
-# Base packages (all universally available)
-apt-get install -y -qq \
-  curl wget git build-essential unzip \
-  software-properties-common \
-  apt-transport-https ca-certificates \
-  gnupg lsb-release
-
-# Python packages (names differ across Ubuntu versions)
-safe_apt_install python3 python3-pip python3-venv python3-dev
-
-# Create python → python3 symlink if needed
-if ! command -v python &>/dev/null && command -v python3 &>/dev/null; then
-  ln -sf "$(command -v python3)" /usr/local/bin/python
-  echo -e "${GREEN}  ✔ Created python → python3 symlink${NC}"
-fi
-
-echo -e "${GREEN}✔ System updated${NC}"
-
-# ─── Node.js LTS ──────────────────────────────────────────────
-echo -e "\n${YELLOW}[2/8] Installing Node.js LTS...${NC}"
-if ! command -v node &>/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - 2>/dev/null
-  apt-get install -y -qq nodejs
-fi
-node_ver=$(node --version)
-npm_ver=$(npm --version)
-echo -e "${GREEN}✔ Node.js ${node_ver}, npm ${npm_ver}${NC}"
-
-# ─── Java 21 ──────────────────────────────────────────────────
-echo -e "\n${YELLOW}[3/8] Installing Java 21...${NC}"
-if ! java --version &>/dev/null 2>&1; then
-  # Try openjdk-21, fallback to openjdk-17
-  if apt-cache show openjdk-21-jdk-headless &>/dev/null 2>&1; then
-    apt-get install -y -qq openjdk-21-jdk-headless
-  elif apt-cache show openjdk-21-jdk &>/dev/null 2>&1; then
-    apt-get install -y -qq openjdk-21-jdk
-  else
-    echo -e "${YELLOW}  Java 21 not in repos, trying manual install...${NC}"
-    # Download OpenJDK 21 directly
-    JDK_URL="https://download.java.net/java/GA/jdk21.0.4/99aef36f30be4c0b/7/GPL/openjdk-21.0.4_linux-x64_bin.tar.gz"
-    if [ "$(uname -m)" = "aarch64" ]; then
-      JDK_URL="https://download.java.net/java/GA/jdk21.0.4/99aef36f30be4c0b/7/GPL/openjdk-21.0.4_linux-aarch64_bin.tar.gz"
-    fi
-    mkdir -p /opt/java
-    wget -q "$JDK_URL" -O /tmp/jdk21.tar.gz
-    tar -xzf /tmp/jdk21.tar.gz -C /opt/java
-    rm -f /tmp/jdk21.tar.gz
-    JDK_DIR=$(ls -d /opt/java/jdk-21* | head -1)
-    ln -sf "$JDK_DIR/bin/java"  /usr/local/bin/java
-    ln -sf "$JDK_DIR/bin/javac" /usr/local/bin/javac
-    export JAVA_HOME="$JDK_DIR"
-    echo "export JAVA_HOME=$JDK_DIR" >> /etc/environment
+install_node() {
+  if ! command -v node &>/dev/null; then
+    echo -e "${YELLOW}Installing Node.js LTS...${NC}"
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> $LOG_PATH 2>&1
+    apt-get install -y -qq nodejs >> $LOG_PATH 2>&1
   fi
-fi
-java_ver=$(java --version 2>&1 | head -1)
-echo -e "${GREEN}✔ ${java_ver}${NC}"
+  echo -e "${GREEN}✔ Node.js $(node --version) installed${NC}"
+}
 
-# ─── Python 3 ─────────────────────────────────────────────────
-echo -e "\n${YELLOW}[4/8] Verifying Python 3...${NC}"
-python3_ver=$(python3 --version 2>&1)
-# Upgrade pip using get-pip if pip3 not installed
-if ! command -v pip3 &>/dev/null; then
-  echo -e "${YELLOW}  pip3 not found, installing via get-pip.py...${NC}"
-  curl -sS https://bootstrap.pypa.io/get-pip.py | python3
-fi
-pip3_ver=$(pip3 --version 2>&1 | cut -d' ' -f1-2)
-echo -e "${GREEN}✔ ${python3_ver}, ${pip3_ver}${NC}"
-
-# ─── Docker ───────────────────────────────────────────────────
-echo -e "\n${YELLOW}[5/8] Installing Docker...${NC}"
-if ! command -v docker &>/dev/null; then
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-    gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null
-  chmod a+r /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu ${CODENAME} stable" \
-    > /etc/apt/sources.list.d/docker.list
-  apt-get update -qq
-  # Try docker-ce, fallback to docker.io
-  if apt-cache show docker-ce &>/dev/null 2>&1; then
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin
-  else
-    apt-get install -y -qq docker.io
+install_docker() {
+  if ! command -v docker &>/dev/null; then
+    echo -e "${YELLOW}Installing Docker Container Engine...${NC}"
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg >> $LOG_PATH 2>&1
+    chmod a+r /etc/apt/keyrings/docker.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+    apt-get update -qq >> $LOG_PATH 2>&1
+    apt-get install -y -qq docker-ce docker-ce-cli containerd.io >> $LOG_PATH 2>&1
+    systemctl enable docker --quiet 2>/dev/null || true
+    systemctl start docker 2>/dev/null || true
   fi
-  systemctl enable docker --quiet 2>/dev/null || true
-  systemctl start  docker         2>/dev/null || true
-fi
-docker_ver=$(docker --version)
-echo -e "${GREEN}✔ ${docker_ver}${NC}"
+  echo -e "${GREEN}✔ Docker $(docker --version) installed${NC}"
+}
 
-# ─── Panel Setup ──────────────────────────────────────────────
-echo -e "\n${YELLOW}[6/8] Setting up Orbiton...${NC}"
-mkdir -p "$PANEL_DIR" "$DATA_DIR/apps" "$PANEL_DIR/certs"
+install_java_python() {
+  echo -e "${YELLOW}Checking Java and Python environments...${NC}"
+  safe_apt_install python3 python3-pip python3-venv openjdk-21-jdk-headless
+}
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp -r "$SCRIPT_DIR/backend"  "$PANEL_DIR/"
-cp -r "$SCRIPT_DIR/frontend" "$PANEL_DIR/"
-
-# Install npm dependencies
-cd "$PANEL_DIR/backend"
-npm install --omit=dev
-
-# node-pty: try native build, fallback gracefully
-npm install node-pty --build-from-source 2>/dev/null || \
-npm install node-pty 2>/dev/null || \
-echo -e "${YELLOW}  ⚠ node-pty skipped (terminal will use fallback mode)${NC}"
-
-# ─── SSL Certificate ──────────────────────────────────────────
-echo -e "\n${YELLOW}[7/8] SSL Certificate...${NC}"
-echo ""
-echo "  [1] Generate self-signed cert (instant, browser warning)"
-echo "  [2] Get Let's Encrypt cert   (requires domain + port 80)"
-echo "  [3] Skip SSL                 (HTTP only)"
-echo ""
-read -rp "  Choice [1]: " ssl_choice
-ssl_choice="${ssl_choice:-1}"
-
-DISABLE_SSL="false"
-
-case "$ssl_choice" in
-  1)
-    if ! openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+generate_ssl() {
+  mkdir -p "$PANEL_DIR/certs"
+  if ! openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+    -keyout "$PANEL_DIR/certs/privkey.pem" \
+    -out    "$PANEL_DIR/certs/fullchain.pem" \
+    -subj "/CN=orbiton/O=Orbiton/C=VN" -quiet 2>/dev/null; then
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
       -keyout "$PANEL_DIR/certs/privkey.pem" \
       -out    "$PANEL_DIR/certs/fullchain.pem" \
-      -subj "/CN=orbiton/O=Orbiton/C=VN" -quiet 2>/dev/null; then
-      echo -e "${YELLOW}  ⚠ Quiet OpenSSL generation failed, trying fallback...${NC}"
-      openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
-        -keyout "$PANEL_DIR/certs/privkey.pem" \
-        -out    "$PANEL_DIR/certs/fullchain.pem" \
-        -subj "/CN=orbiton" || true
-    fi
-    chmod 600 "$PANEL_DIR/certs/privkey.pem" 2>/dev/null || true
-    chmod 644 "$PANEL_DIR/certs/fullchain.pem" 2>/dev/null || true
-    echo -e "${GREEN}✔ Self-signed SSL cert generated (10 years)${NC}"
-    ;;
-  2)
-    apt-get install -y -qq certbot 2>/dev/null || safe_apt_install certbot
-    read -rp "  Domain (e.g. panel.example.com): " le_domain
-    read -rp "  Email: " le_email
-    certbot certonly --standalone -d "$le_domain" --email "$le_email" \
-      --agree-tos --non-interactive
-    ln -sf "/etc/letsencrypt/live/$le_domain/fullchain.pem" "$PANEL_DIR/certs/fullchain.pem"
-    ln -sf "/etc/letsencrypt/live/$le_domain/privkey.pem"   "$PANEL_DIR/certs/privkey.pem"
-    (crontab -l 2>/dev/null; echo "0 3 * * * certbot renew --quiet && systemctl restart $SERVICE_NAME") | crontab -
-    echo -e "${GREEN}✔ Let's Encrypt cert installed for ${le_domain}${NC}"
-    ;;
-  *)
-    DISABLE_SSL="true"
-    echo -e "${YELLOW}  Skipping SSL — HTTP only${NC}"
-    ;;
-esac
+      -subj "/CN=orbiton" || true
+  fi
+  chmod 600 "$PANEL_DIR/certs/privkey.pem" 2>/dev/null || true
+  chmod 644 "$PANEL_DIR/certs/fullchain.pem" 2>/dev/null || true
+  echo -e "${GREEN}✔ Generated self-signed SSL certs${NC}"
+}
 
-# Create .env
-JWT_SECRET=$(openssl rand -hex 32)
-cat > "$PANEL_DIR/backend/.env" << EOF
-PORT=${PORT}
-SSL_PORT=${SSL_PORT}
+letsencrypt_ssl() {
+  apt-get install -y -qq certbot >> $LOG_PATH 2>&1
+  read -rp "  Domain (e.g. panel.example.com): " le_domain
+  read -rp "  Email: " le_email
+  certbot certonly --standalone -d "$le_domain" --email "$le_email" --agree-tos --non-interactive >> $LOG_PATH 2>&1
+  mkdir -p "$PANEL_DIR/certs"
+  ln -sf "/etc/letsencrypt/live/$le_domain/fullchain.pem" "$PANEL_DIR/certs/fullchain.pem"
+  ln -sf "/etc/letsencrypt/live/$le_domain/privkey.pem"   "$PANEL_DIR/certs/privkey.pem"
+  echo -e "${GREEN}✔ Let's Encrypt certificate configured for ${le_domain}${NC}"
+}
+
+install_panel() {
+  echo -e "\n${YELLOW}🛠️ Installing Orbiton Panel...${NC}"
+  update_system
+  install_node
+
+  mkdir -p "$PANEL_DIR"
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  cp -r "$SCRIPT_DIR/panel/"* "$PANEL_DIR/"
+  
+  # Install deps
+  cd "$PANEL_DIR"
+  npm install --omit=dev >> $LOG_PATH 2>&1
+
+  # Create .env
+  JWT_SECRET=$(openssl rand -hex 32)
+  DAEMON_TOKEN="orbiton_daemon_secret_$(openssl rand -hex 16)"
+  cat > "$PANEL_DIR/.env" << EOF
+PORT=3000
+SSL_PORT=3443
 JWT_SECRET=${JWT_SECRET}
 NODE_ENV=production
-DATA_DIR=${DATA_DIR}
-DISABLE_SSL=${DISABLE_SSL}
+DISABLE_SSL=true
+DAEMON_URL=http://localhost:8080
+DAEMON_TOKEN=${DAEMON_TOKEN}
 EOF
-chmod 600 "$PANEL_DIR/backend/.env"
-echo -e "${GREEN}✔ Orbiton installed to ${PANEL_DIR}${NC}"
+  chmod 600 "$PANEL_DIR/.env"
 
-# ─── Systemd Service ──────────────────────────────────────────
-echo -e "\n${YELLOW}[8/8] Creating systemd service...${NC}"
-cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
+  # Systemd
+  cat > "/etc/systemd/system/orbiton-panel.service" << EOF
 [Unit]
-Description=Orbiton — Universal App & Server Manager
+Description=Orbiton Panel - Central Manager
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${PANEL_DIR}
+ExecStart=/usr/bin/node ${PANEL_DIR}/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orbiton-panel
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable orbiton-panel --quiet
+  systemctl start orbiton-panel
+  echo -e "${GREEN}✔ Orbiton Panel daemon started!${NC}"
+}
+
+install_daemon() {
+  echo -e "\n${YELLOW}🛠️ Installing Orbiton Daemon (Wings equivalent)...${NC}"
+  update_system
+  install_node
+  install_docker
+  install_java_python
+
+  mkdir -p "$DAEMON_DIR" "$DATA_DIR/apps"
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  cp -r "$SCRIPT_DIR/daemon/"* "$DAEMON_DIR/"
+
+  # Install deps
+  cd "$DAEMON_DIR"
+  npm install --omit=dev >> $LOG_PATH 2>&1
+  npm install node-pty --build-from-source >> $LOG_PATH 2>&1 || npm install node-pty >> $LOG_PATH 2>&1 || true
+
+  # Fetch or create DAEMON_TOKEN
+  DAEMON_TOKEN="orbiton_daemon_secret_$(openssl rand -hex 16)"
+  if [ -f "$PANEL_DIR/.env" ]; then
+    # link AIO token
+    DAEMON_TOKEN=$(grep DAEMON_TOKEN "$PANEL_DIR/.env" | cut -d '=' -f2)
+  fi
+
+  cat > "$DAEMON_DIR/.env" << EOF
+PORT=8080
+DAEMON_TOKEN=${DAEMON_TOKEN}
+DATA_DIR=${DATA_DIR}
+NODE_ENV=production
+EOF
+  chmod 600 "$DAEMON_DIR/.env"
+
+  # Systemd
+  cat > "/etc/systemd/system/orbiton-daemon.service" << EOF
+[Unit]
+Description=Orbiton Daemon (Wings) - Node Manager
 After=network.target docker.service
 Wants=docker.service
 
 [Service]
 Type=simple
 User=root
-WorkingDirectory=${PANEL_DIR}/backend
-ExecStart=/usr/bin/node ${PANEL_DIR}/backend/server.js
+WorkingDirectory=${DAEMON_DIR}
+ExecStart=/usr/bin/node ${DAEMON_DIR}/server.js
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=orbiton
+SyslogIdentifier=orbiton-daemon
 Environment=NODE_ENV=production
-EnvironmentFile=${PANEL_DIR}/backend/.env
 
 [Install]
 WantedBy=multi-user.target
 EOF
+  systemctl daemon-reload
+  systemctl enable orbiton-daemon --quiet
+  systemctl start orbiton-daemon
+  echo -e "${GREEN}✔ Orbiton Daemon (Wings) started on port 8080!${NC}"
+}
 
-systemctl daemon-reload
-systemctl enable "$SERVICE_NAME" --quiet
-systemctl start  "$SERVICE_NAME"
+uninstall_orbiton() {
+  echo -e "\n${RED}🛑 Uninstalling Orbiton Panel and Daemon...${NC}"
+  systemctl stop orbiton-panel --quiet 2>/dev/null || true
+  systemctl disable orbiton-panel --quiet 2>/dev/null || true
+  systemctl stop orbiton-daemon --quiet 2>/dev/null || true
+  systemctl disable orbiton-daemon --quiet 2>/dev/null || true
+  
+  rm -f /etc/systemd/system/orbiton-panel.service
+  rm -f /etc/systemd/system/orbiton-daemon.service
+  systemctl daemon-reload
 
-# ─── Firewall ─────────────────────────────────────────────────
-if command -v ufw &>/dev/null; then
-  ufw allow "$PORT"     comment "Orbiton HTTP"  > /dev/null 2>&1 || true
-  ufw allow "$SSL_PORT" comment "Orbiton HTTPS" > /dev/null 2>&1 || true
-  echo -e "${GREEN}✔ Firewall rules added (ufw)${NC}"
-fi
+  rm -rf "$PANEL_DIR" "$DAEMON_DIR"
+  echo -n "* Do you want to delete application data database/files at $DATA_DIR? (y/N): "
+  read -r rm_data
+  if [[ "$rm_data" =~ [Yy] ]]; then
+    rm -rf "$DATA_DIR"
+    echo -e "${GREEN}✔ Application data removed.${NC}"
+  fi
+  echo -e "${GREEN}✔ Orbiton uninstalled successfully!${NC}"
+}
 
-# ─── Done ─────────────────────────────────────────────────────
-PUBLIC_IP=$(curl -s4 --max-time 5 ifconfig.me 2>/dev/null || \
-            curl -s4 --max-time 5 api.ipify.org 2>/dev/null || \
-            hostname -I | awk '{print $1}')
+welcome
 
-echo -e "\n${GREEN}${BOLD}"
-echo "╔══════════════════════════════════════════════╗"
-echo "║        ✅ Orbiton Installed!                 ║"
-echo "╚══════════════════════════════════════════════╝"
-echo -e "${NC}"
-echo -e "  ${BOLD}Access:${NC}"
-echo -e "  HTTP  → http://${PUBLIC_IP}:${PORT}"
-if [ -f "$PANEL_DIR/certs/fullchain.pem" ]; then
-  echo -e "  HTTPS → https://${PUBLIC_IP}:${SSL_PORT}"
-fi
-echo ""
-echo -e "  ${BOLD}Login:${NC} admin / admin123"
-echo -e "  ${YELLOW}⚠ Change default password immediately!${NC}"
-echo ""
-echo -e "  ${BOLD}Commands:${NC}"
-echo -e "  sudo systemctl status  ${SERVICE_NAME}"
-echo -e "  sudo systemctl restart ${SERVICE_NAME}"
-echo -e "  sudo journalctl -u ${SERVICE_NAME} -f"
-echo ""
+done=false
+while [ "$done" == false ]; do
+  options=(
+    "Install All-in-One (Panel & local Daemon on the same machine)"
+    "Install Panel only (Central UI & User Database)"
+    "Install Daemon only (Wings Agent on Node VPS)"
+    "Configure Let's Encrypt SSL certificate"
+    "Uninstall Panel & Daemon"
+  )
+
+  for i in "${!options[@]}"; do
+    echo -e "  [${GREEN}$i${NC}] ${options[$i]}"
+  done
+
+  echo -n -e "\n* Enter option [0-$((${#options[@]} - 1))]: "
+  read -r action
+
+  if [ -z "$action" ]; then
+    action=0
+  fi
+
+  case "$action" in
+    0)
+      install_panel
+      install_daemon
+      done=true
+      ;;
+    1)
+      install_panel
+      done=true
+      ;;
+    2)
+      install_daemon
+      done=true
+      ;;
+    3)
+      letsencrypt_ssl
+      done=true
+      ;;
+    4)
+      uninstall_orbiton
+      done=true
+      ;;
+    *)
+      echo -e "${RED}Invalid selection${NC}"
+      ;;
+  esac
+done
+
+echo -e "\n${GREEN}${BOLD}================================================${NC}"
+echo -e "${GREEN}${BOLD}🪐 Orbiton Setup Completed Successfully!        ${NC}"
+echo -e "${GREEN}${BOLD}================================================${NC}"
+PUBLIC_IP=$(curl -s4 ifconfig.me || curl -s4 api.ipify.org || hostname -I | awk '{print $1}')
+echo -e "  Panel Access:  ${BOLD}http://${PUBLIC_IP}:3000${NC}"
+echo -e "  Default Admin: ${BOLD}admin / admin123${NC}"
+echo -e "  Log file:      ${BOLD}$LOG_PATH${NC}\n"

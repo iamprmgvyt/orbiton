@@ -1,6 +1,6 @@
 // ============================================================
-// File Manager Routes - Browse, Upload, Download, Edit, Delete
-// Rename, Move, Archive (.zip/.tar.gz), Extract
+// Daemon File Manager Routes - Local Filesystem Operations
+// Auth via DAEMON_TOKEN, no direct database queries.
 // ============================================================
 const express  = require('express');
 const multer   = require('multer');
@@ -10,9 +10,9 @@ const archiver = require('archiver');
 const unzipper = require('unzipper');
 const tar      = require('tar');
 const mime     = require('mime-types');
-const { db, DATA_DIR } = require('../db/database');
-const router   = express.Router();
 
+const router = express.Router();
+const DATA_DIR = process.env.DATA_DIR || '/opt/orbiton-data';
 const APPS_DIR = path.join(DATA_DIR, 'apps');
 
 // ─── Multer config ───────────────────────────────────────────
@@ -37,18 +37,8 @@ function safePath(appId, relativePath = '/') {
   return full;
 }
 
-function checkAppAccess(req, res) {
-  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.appId);
-  if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
-  if (req.user.role !== 'admin' && app.owner_id !== req.user.id) {
-    res.status(403).json({ error: 'Access denied' }); return null;
-  }
-  return app;
-}
-
 // GET /api/files/:appId/list?path=/
 router.get('/:appId/list', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const dir = safePath(req.params.appId, req.query.path || '/');
     if (!fs.existsSync(dir))
@@ -82,7 +72,6 @@ router.get('/:appId/list', (req, res) => {
 
 // GET /api/files/:appId/read?path=/file.txt
 router.get('/:appId/read', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const filePath = safePath(req.params.appId, req.query.path);
     if (!fs.existsSync(filePath))
@@ -99,7 +88,6 @@ router.get('/:appId/read', (req, res) => {
 
 // POST /api/files/:appId/write
 router.post('/:appId/write', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const { path: filePath, content } = req.body;
     if (!filePath) return res.status(400).json({ error: 'path required' });
@@ -115,7 +103,6 @@ router.post('/:appId/write', (req, res) => {
 
 // DELETE /api/files/:appId/delete?path=/file.txt
 router.delete('/:appId/delete', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const target = safePath(req.params.appId, req.query.path);
     if (!fs.existsSync(target))
@@ -134,7 +121,6 @@ router.delete('/:appId/delete', (req, res) => {
 
 // POST /api/files/:appId/mkdir
 router.post('/:appId/mkdir', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const dir = safePath(req.params.appId, req.body.path);
     fs.mkdirSync(dir, { recursive: true });
@@ -144,9 +130,8 @@ router.post('/:appId/mkdir', (req, res) => {
   }
 });
 
-// POST /api/files/:appId/rename  { from, to }
+// POST /api/files/:appId/rename
 router.post('/:appId/rename', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const from = safePath(req.params.appId, req.body.from);
     const to   = safePath(req.params.appId, req.body.to);
@@ -159,9 +144,8 @@ router.post('/:appId/rename', (req, res) => {
   }
 });
 
-// POST /api/files/:appId/move  { from, to }
+// POST /api/files/:appId/move
 router.post('/:appId/move', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const from = safePath(req.params.appId, req.body.from);
     const to   = safePath(req.params.appId, req.body.to);
@@ -175,9 +159,8 @@ router.post('/:appId/move', (req, res) => {
   }
 });
 
-// POST /api/files/:appId/archive  { path, format: 'zip'|'tar.gz', destName }
+// POST /api/files/:appId/archive
 router.post('/:appId/archive', async (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const { path: srcPath, format = 'zip', destName } = req.body;
     if (!srcPath) return res.status(400).json({ error: 'path required' });
@@ -214,9 +197,8 @@ router.post('/:appId/archive', async (req, res) => {
   }
 });
 
-// POST /api/files/:appId/extract  { path, destDir }
+// POST /api/files/:appId/extract
 router.post('/:appId/extract', async (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const { path: srcPath, destDir } = req.body;
     if (!srcPath) return res.status(400).json({ error: 'path required' });
@@ -249,17 +231,13 @@ router.post('/:appId/extract', async (req, res) => {
   }
 });
 
-// POST /api/files/:appId/upload?path=/
-router.post('/:appId/upload', (req, res, next) => {
-  if (!checkAppAccess(req, res)) return;
-  next();
-}, upload.array('files', 50), (req, res) => {
+// POST /api/files/:appId/upload
+router.post('/:appId/upload', upload.array('files', 50), (req, res) => {
   res.json({ success: true, count: req.files?.length || 0 });
 });
 
-// GET /api/files/:appId/download?path=/file.txt
+// GET /api/files/:appId/download
 router.get('/:appId/download', (req, res) => {
-  if (!checkAppAccess(req, res)) return;
   try {
     const target = safePath(req.params.appId, req.query.path);
     if (!fs.existsSync(target))
@@ -268,8 +246,7 @@ router.get('/:appId/download', (req, res) => {
     const stat = fs.statSync(target);
     if (stat.isDirectory()) {
       res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition',
-        `attachment; filename="${path.basename(target)}.zip"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${path.basename(target)}.zip"`);
       const archive = archiver('zip', { zlib: { level: 9 } });
       archive.pipe(res);
       archive.directory(target, path.basename(target));

@@ -1,0 +1,358 @@
+// ============================================================
+// Orbiton Panel - Application Routes
+// central controller dispatching actions to local/remote daemons
+// ============================================================
+const express  = require('express');
+const path     = require('path');
+const fs       = require('fs');
+const multer   = require('multer');
+const { v4: uuidv4 } = require('uuid');
+const FormData = require('form-data');
+const { db }   = require('../db/database');
+const { daemonRequest, DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi');
+
+const router = express.Router();
+
+const zipUpload = multer({
+  dest: require('os').tmpdir(),
+  limits: { fileSize: 500 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    cb(null, file.mimetype === 'application/zip' ||
+             file.originalname.endsWith('.zip') ||
+             file.originalname.endsWith('.tar.gz'));
+  },
+});
+
+// Helper for daemon runtimes/templates since they are static config presets
+const RUNTIMES = {
+  nodejs:  { label: 'Node.js',   icon: '🟩', color: '#43a047', desc: 'npm, yarn, bun' },
+  python:  { label: 'Python',    icon: '🐍', color: '#1565c0', desc: 'python3, pip, venv' },
+  java:    { label: 'Java',      icon: '☕', color: '#e65100', desc: 'Java 8/11/17/21/22+' },
+  docker:  { label: 'Docker',    icon: '🐳', color: '#0277bd', desc: 'Any Docker image' },
+  bash:    { label: 'Shell',     icon: '🔧', color: '#6a1b9a', desc: 'bash/sh/zsh/cmd/pwsh' },
+  deno:    { label: 'Deno',      icon: '🦕', color: '#00796b', desc: 'Deno runtime' },
+  bun:     { label: 'Bun',       icon: '🥟', color: '#f57c00', desc: 'Bun runtime' },
+  go:      { label: 'Go',        icon: '🔵', color: '#0097a7', desc: 'Go runtime' },
+  rust:    { label: 'Rust',      icon: '🦀', color: '#b71c1c', desc: 'Cargo, Rust' },
+  php:     { label: 'PHP',       icon: '🐘', color: '#7b1fa2', desc: 'PHP, Laravel, Composer' },
+  ruby:    { label: 'Ruby',      icon: '💎', color: '#c62828', desc: 'Ruby, Rails, Gem' },
+  custom:  { label: 'Custom',    icon: '⚙️', color: '#37474f', desc: 'Any custom command' },
+};
+
+const TEMPLATES = {
+  discord_js: {
+    name: 'Discord.js Bot',
+    runtime: 'nodejs',
+    start_cmd: 'node index.js',
+    description: 'Discord bot with Node.js',
+    icon: '🤖',
+    env_hint: '{"DISCORD_TOKEN": "your-token"}',
+    readme: 'npm install discord.js dotenv',
+  },
+  discord_py: {
+    name: 'Discord.py Bot',
+    runtime: 'python',
+    start_cmd: 'python3 bot.py',
+    description: 'Discord bot with Python',
+    icon: '🤖',
+    env_hint: '{"DISCORD_TOKEN": "your-token"}',
+    readme: 'pip3 install discord.py python-dotenv',
+  },
+  express_api: {
+    name: 'Express.js API',
+    runtime: 'nodejs',
+    start_cmd: 'node server.js',
+    description: 'Express.js REST API server',
+    icon: '🌐',
+    env_hint: '{"PORT": "3000"}',
+    readme: 'npm install express',
+  },
+  fastapi: {
+    name: 'FastAPI',
+    runtime: 'python',
+    start_cmd: 'python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload',
+    description: 'FastAPI Python web framework',
+    icon: '⚡',
+    env_hint: '{}',
+    readme: 'pip3 install fastapi uvicorn',
+  },
+  minecraft: {
+    name: 'Minecraft Server',
+    runtime: 'java',
+    start_cmd: 'java -Xmx2G -Xms512M -jar server.jar nogui',
+    description: 'Minecraft Java Edition server',
+    icon: '⛏️',
+    max_ram: 2048,
+    env_hint: '{}',
+    readme: 'Download server.jar from minecraft.net',
+  },
+};
+
+// ─── List All Apps ────────────────────────────────────────────
+router.get('/', async (req, res) => {
+  try {
+    let apps;
+    if (req.user.role === 'admin') {
+      apps = db.prepare(`
+        SELECT a.*, u.username AS owner_name
+        FROM apps a JOIN users u ON a.owner_id = u.id
+        ORDER BY a.created_at DESC
+      `).all();
+    } else {
+      apps = db.prepare(`
+        SELECT a.*, u.username AS owner_name
+        FROM apps a JOIN users u ON a.owner_id = u.id
+        WHERE a.owner_id = ?
+        ORDER BY a.created_at DESC
+      `).all(req.user.id);
+    }
+
+    const running = await daemonRequest('/api/apps/status').catch(() => ({}));
+    apps = apps.map(a => ({
+      ...a,
+      env_vars:   JSON.parse(a.env_vars || '{}'),
+      liveStatus: running[a.id]?.status || a.status,
+      pid:        running[a.id]?.pid    || null,
+    }));
+
+    res.json(apps);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Get Templates ────────────────────────────────────────────
+router.get('/templates', (req, res) => {
+  res.json(TEMPLATES);
+});
+
+// ─── Get Runtime List ─────────────────────────────────────────
+router.get('/runtimes', async (req, res) => {
+  try {
+    const data = await daemonRequest('/api/system/runtimes');
+    res.json(data);
+  } catch (_) {
+    res.json(RUNTIMES);
+  }
+});
+
+// ─── Create App ───────────────────────────────────────────────
+router.post('/', (req, res) => {
+  const { name, description, runtime, start_cmd, env_vars, max_ram, auto_restart, template } = req.body;
+
+  let tpl = {};
+  if (template && TEMPLATES[template]) {
+    tpl = TEMPLATES[template];
+  }
+
+  const finalName    = name?.trim() || tpl.name;
+  const finalCmd     = start_cmd?.trim() || tpl.start_cmd;
+  const finalRuntime = runtime || tpl.runtime || 'custom';
+
+  if (!finalName || !finalCmd)
+    return res.status(400).json({ error: 'name and start_cmd are required' });
+
+  const id      = uuidv4();
+  const workDir = `/opt/orbiton-data/apps/${id}`;
+
+  db.prepare(`
+    INSERT INTO apps (id, name, description, runtime, start_cmd, work_dir,
+                      owner_id, env_vars, max_ram, auto_restart)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    finalName,
+    description || tpl.description || '',
+    finalRuntime,
+    finalCmd,
+    workDir,
+    req.user.id,
+    JSON.stringify(env_vars || {}),
+    max_ram || tpl.max_ram || 512,
+    auto_restart ? 1 : 0
+  );
+
+  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+  res.status(201).json(app);
+});
+
+// ─── Get App ──────────────────────────────────────────────────
+router.get('/:id', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  const status = await daemonRequest(`/api/apps/${app.id}/status`).catch(() => ({ status: 'stopped', pid: null }));
+  res.json({ ...app, env_vars: JSON.parse(app.env_vars || '{}'), ...status });
+});
+
+// ─── Update App ───────────────────────────────────────────────
+router.patch('/:id', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+
+  const { name, description, runtime, start_cmd, env_vars, max_ram, auto_restart } = req.body;
+  const statusInfo = await daemonRequest(`/api/apps/${app.id}/status`).catch(() => ({ status: 'stopped' }));
+  if (statusInfo.status === 'running')
+    return res.status(409).json({ error: 'Stop the application first before editing' });
+
+  db.prepare(`
+    UPDATE apps SET
+      name         = COALESCE(?, name),
+      description  = COALESCE(?, description),
+      runtime      = COALESCE(?, runtime),
+      start_cmd    = COALESCE(?, start_cmd),
+      env_vars     = COALESCE(?, env_vars),
+      max_ram      = COALESCE(?, max_ram),
+      auto_restart = COALESCE(?, auto_restart)
+    WHERE id = ?
+  `).run(
+    name || null,
+    description !== undefined ? description : null,
+    runtime || null,
+    start_cmd || null,
+    env_vars ? JSON.stringify(env_vars) : null,
+    max_ram || null,
+    auto_restart !== undefined ? (auto_restart ? 1 : 0) : null,
+    app.id
+  );
+
+  res.json(db.prepare('SELECT * FROM apps WHERE id = ?').get(app.id));
+});
+
+// ─── Delete App ───────────────────────────────────────────────
+router.delete('/:id', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+
+  try { await daemonRequest(`/api/apps/${app.id}/stop`, 'POST'); } catch (_) {}
+  try { await daemonRequest(`/api/files/${app.id}/delete?path=/`, 'DELETE'); } catch (_) {}
+  
+  db.prepare('DELETE FROM apps WHERE id = ?').run(app.id);
+  res.json({ success: true });
+});
+
+// ─── Process Control ──────────────────────────────────────────
+router.post('/:id/start', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    const appConfig = { ...app, env_vars: JSON.parse(app.env_vars || '{}') };
+    const result = await daemonRequest(`/api/apps/${app.id}/start`, 'POST', { appConfig });
+    res.json({ success: true, ...result });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/:id/stop', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    await daemonRequest(`/api/apps/${app.id}/stop`, 'POST');
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/:id/restart', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    const appConfig = { ...app, env_vars: JSON.parse(app.env_vars || '{}') };
+    await daemonRequest(`/api/apps/${app.id}/restart`, 'POST', { appConfig });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+router.post('/:id/kill', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    await daemonRequest(`/api/apps/${app.id}/kill`, 'POST');
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ─── Send stdin ───────────────────────────────────────────────
+router.post('/:id/input', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  const { input } = req.body;
+  if (input === undefined) return res.status(400).json({ error: 'input required' });
+  try {
+    await daemonRequest(`/api/apps/${app.id}/input`, 'POST', { input });
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ─── Logs ─────────────────────────────────────────────────────
+router.get('/:id/logs', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    const data = await daemonRequest(`/api/apps/${app.id}/logs?lines=${req.query.lines || 200}`);
+    res.json(data);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ─── Import: Git Clone ────────────────────────────────────────
+router.post('/:id/import/git', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  const { url, branch } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+
+  try {
+    await daemonRequest(`/api/apps/${app.id}/import/git`, 'POST', { url, branch });
+    db.prepare("UPDATE apps SET import_source = ? WHERE id = ?").run(`git:${url}`, app.id);
+    res.json({ success: true, message: 'Git clone started' });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ─── Import: ZIP Upload ───────────────────────────────────────
+router.post('/:id/import/zip', zipUpload.single('file'), async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  if (!req.file) return res.status(400).json({ error: 'ZIP file required' });
+
+  try {
+    const fd = new FormData();
+    fd.append('file', fs.createReadStream(req.file.path), req.file.originalname);
+    
+    const fetch = global.fetch || require('node-fetch');
+    const resDaemon = await fetch(`${DAEMON_URL}/api/apps/${app.id}/import/zip`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DAEMON_TOKEN}`,
+        ...fd.getHeaders()
+      },
+      body: fd
+    });
+    const data = await resDaemon.json();
+    if (!resDaemon.ok) throw new Error(data.error || 'Failed proxying zip');
+
+    db.prepare("UPDATE apps SET import_source = ? WHERE id = ?").run('zip', app.id);
+    res.json({ success: true, message: 'Extracting ZIP...' });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ─── Import: Docker Pull ──────────────────────────────────────
+router.post('/:id/import/docker', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  const { image } = req.body;
+  if (!image) return res.status(400).json({ error: 'image required' });
+
+  try {
+    await daemonRequest(`/api/apps/${app.id}/import/docker`, 'POST', { image });
+    db.prepare("UPDATE apps SET import_source = ?, start_cmd = ? WHERE id = ?")
+      .run(`docker:${image}`, `docker run --rm ${image}`, app.id);
+    res.json({ success: true, message: `Pulling ${image}...` });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
+// ─── Auth Helper ──────────────────────────────────────────────
+function getAuthorizedApp(req, res) {
+  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
+  if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
+  if (req.user.role !== 'admin' && app.owner_id !== req.user.id) {
+    res.status(403).json({ error: 'Access denied' }); return null;
+  }
+  return app;
+}
+
+module.exports = router;
