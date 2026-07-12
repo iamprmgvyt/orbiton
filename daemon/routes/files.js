@@ -30,7 +30,7 @@ const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
 
 // ─── Helpers ─────────────────────────────────────────────────
 function safePath(appId, relativePath = '/') {
-  const base = path.join(APPS_DIR, appId);
+  const base = path.resolve(APPS_DIR, appId);
   const rel  = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
   const full = path.resolve(base, '.' + rel);
   if (!full.startsWith(base)) throw new Error('Path traversal denied');
