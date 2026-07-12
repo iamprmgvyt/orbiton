@@ -27,8 +27,8 @@ const authMiddleware = require('./middleware/auth');
 const app = express();
 
 // ─── Configuration ────────────────────────────────────────────
-const PORT     = parseInt(process.env.PORT     || '80');
-const SSL_PORT = parseInt(process.env.SSL_PORT || '443');
+const PORT     = parseInt(process.env.PORT     || '3000');
+const SSL_PORT = parseInt(process.env.SSL_PORT || '3443');
 const FRONTEND = path.join(__dirname, '..', 'frontend');
 
 // Certs: look in ./certs/ relative to project root
