@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DOCS_SECTIONS } from './docsData';
+import { supabase } from './utils/supabaseClient';
 import { 
   Menu, 
   X, 
@@ -24,19 +25,62 @@ function FeedbackForm() {
   const [submitted, setSubmitted] = useState(false);
   const [allFeedbacks, setAllFeedbacks] = useState([]);
 
+  const PANEL_API_URL = import.meta.env.VITE_PANEL_API_URL || '';
+
+  const loadFeedbacks = async () => {
+    try {
+      if (PANEL_API_URL) {
+        const res = await fetch(`${PANEL_API_URL}/feedbacks`);
+        if (!res.ok) throw new Error('Failed to fetch from Panel API');
+        const data = await res.json();
+        setAllFeedbacks(data || []);
+        return;
+      }
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setAllFeedbacks(data || []);
+    } catch (err) {
+      console.warn('Query failed. Falling back to localStorage:', err.message);
+      const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
+      setAllFeedbacks(list);
+    }
+  };
+
   useEffect(() => {
-    const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
-    setAllFeedbacks(list);
+    loadFeedbacks();
   }, [submitted]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !message) return alert('Name and review content are required.');
-    const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
-    const newFeedback = { name, email, rating, message, date: new Date().toLocaleDateString() };
-    list.unshift(newFeedback);
-    localStorage.setItem('orbiton_feedbacks', JSON.stringify(list));
-    setSubmitted(true);
+    
+    const newFeedback = { name, email, rating, message };
+    
+    try {
+      if (PANEL_API_URL) {
+        const res = await fetch(`${PANEL_API_URL}/feedbacks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newFeedback)
+        });
+        if (!res.ok) throw new Error('Failed to save to Panel API');
+        setSubmitted(true);
+      } else {
+        const { error } = await supabase.from('feedbacks').insert([newFeedback]);
+        if (error) throw error;
+        setSubmitted(true);
+      }
+    } catch (err) {
+      console.warn('Save failed. Saving to localStorage:', err.message);
+      const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
+      list.unshift({ ...newFeedback, date: new Date().toLocaleDateString() });
+      localStorage.setItem('orbiton_feedbacks', JSON.stringify(list));
+      setSubmitted(true);
+    }
+
     setName('');
     setEmail('');
     setMessage('');
@@ -122,7 +166,7 @@ function FeedbackForm() {
               <div key={idx} className="review-card">
                 <div className="review-card-header">
                   <span className="review-author">{f.name}</span>
-                  <span className="review-date">{f.date}</span>
+                  <span className="review-date">{f.created_at ? new Date(f.created_at).toLocaleDateString() : (f.date || 'N/A')}</span>
                 </div>
                 <div className="review-stars-static">
                   {Array.from({ length: 5 }).map((_, i) => (

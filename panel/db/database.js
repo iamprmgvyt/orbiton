@@ -102,6 +102,18 @@ function initDatabase() {
     );
   `);
 
+  // Feedbacks (SQLite fallback)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS feedbacks (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      email       TEXT,
+      rating      INTEGER NOT NULL,
+      message     TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   // Insert default local node if empty
   try {
     const count = db.prepare('SELECT COUNT(*) AS count FROM nodes').get().count;

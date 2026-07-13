@@ -58,6 +58,8 @@ app.use('/api/system', authMiddleware, systemRoutes);
 app.use('/api/nodes',  authMiddleware, require('./routes/nodes'));
 
 // Catch-all → serve React frontend SPA index.html
+app.use('/api/feedbacks', require('./routes/feedbacks'));
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND, 'index.html'));
 });
@@ -113,5 +115,31 @@ if (hasSSL) {
 
   primaryServer = httpServer;
 }
+
+// ─── Hourly Counter Logic (1 to 24 Loop) ──────────────────────
+const counterFile = path.join(__dirname, 'counter.json');
+let hourlyCounter = 1;
+if (fs.existsSync(counterFile)) {
+  try {
+    hourlyCounter = JSON.parse(fs.readFileSync(counterFile, 'utf8')).counter || 1;
+  } catch (_) {}
+}
+
+function incrementCounter() {
+  hourlyCounter = hourlyCounter + 1;
+  if (hourlyCounter > 24) hourlyCounter = 1;
+  try {
+    fs.writeFileSync(counterFile, JSON.stringify({ counter: hourlyCounter }), 'utf8');
+  } catch (_) {}
+  console.log(`⏱ Hourly Counter updated to: ${hourlyCounter}`);
+}
+
+// Check and increment every hour (3600000 ms)
+setInterval(incrementCounter, 3600000);
+
+// GET /api/counter - Public endpoint to retrieve counter value
+app.get('/api/counter', (req, res) => {
+  res.json({ counter: hourlyCounter });
+});
 
 module.exports = { app, server: primaryServer };
