@@ -48,17 +48,17 @@ function FeedbackForm() {
     <div className="feedback-section-container">
       {submitted && (
         <div className="feedback-success">
-          <h4>🎉 Góp ý của bạn đã được ghi nhận thành công!</h4>
-          <p>Cảm ơn sự đóng góp quý báu của bạn dành cho sự phát triển của Orbiton Panel.</p>
+          <h4>🎉 Your review has been submitted successfully!</h4>
+          <p>Thank you for your valuable contribution to the development of Orbiton.</p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="feedback-form">
-        <h3 className="feedback-form-title">Đánh giá & Góp ý</h3>
-        <p className="feedback-form-subtitle">Chúng tôi luôn trân trọng mọi góp ý để hoàn thiện Orbiton từng ngày.</p>
+        <h3 className="feedback-form-title">Submit Feedback & Reviews</h3>
+        <p className="feedback-form-subtitle">We always appreciate your thoughts and suggestions to improve Orbiton every day.</p>
         
         <div className="star-rating-wrapper">
-          <span className="rating-label">Mức độ hài lòng:</span>
+          <span className="rating-label">Satisfaction Level:</span>
           <div className="star-rating">
             {[1, 2, 3, 4, 5].map((star) => (
               <span
@@ -74,18 +74,18 @@ function FeedbackForm() {
 
         <div className="feedback-input-grid">
           <div>
-            <label className="feedback-input-label">Họ tên của bạn</label>
+            <label className="feedback-input-label">Your Full Name</label>
             <input
               type="text"
               required
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. Nguyễn Văn A"
+              placeholder="e.g. John Doe"
               className="feedback-input-field"
             />
           </div>
           <div>
-            <label className="feedback-input-label">Email (Không bắt buộc)</label>
+            <label className="feedback-input-label">Email (Optional)</label>
             <input
               type="email"
               value={email}
@@ -97,26 +97,26 @@ function FeedbackForm() {
         </div>
 
         <div>
-          <label className="feedback-input-label">Nội dung góp ý / Đánh giá</label>
+          <label className="feedback-input-label">Your Review / Feedback</label>
           <textarea
             rows="4"
             required
             value={message}
             onChange={e => setMessage(e.target.value)}
-            placeholder="Orbiton chạy rất mượt, giao diện rất đẹp, tôi muốn góp ý thêm tính năng..."
+            placeholder="Orbiton runs smoothly, the interface is gorgeous! I would like to suggest..."
             className="feedback-textarea-field"
           ></textarea>
         </div>
 
         <button type="submit" className="feedback-submit-btn">
-          Gửi đánh giá & góp ý
+          Submit Review & Feedback
         </button>
       </form>
 
       {/* Community Feedbacks List */}
       {allFeedbacks.length > 0 && (
         <div className="community-reviews-list">
-          <h4 className="reviews-list-title">Đánh giá từ cộng đồng ({allFeedbacks.length})</h4>
+          <h4 className="reviews-list-title">Community Reviews ({allFeedbacks.length})</h4>
           <div className="reviews-cards-grid">
             {allFeedbacks.map((f, idx) => (
               <div key={idx} className="review-card">
