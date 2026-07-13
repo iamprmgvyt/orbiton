@@ -17,11 +17,11 @@ Orbiton is a next-generation, lightweight, and open-source server management pan
 * **Global Runtime Shop:** Seamlessly install, detect, or uninstall compiler environments (Node, Python, Java, Go, Rust...) directly via the Web UI.
 
 ### Quick Start Installation (Bash)
-You can set up Orbiton Panel and Daemon Nodes using our official unified bash script on your VPS:
+Clone the entire repository onto your VPS host and run the interactive bash installer:
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/iamprmgvyt/orbiton/main/install.sh -o install.sh
-chmod +x install.sh
-sudo ./install.sh
+git clone https://github.com/iamprmgvyt/orbiton.git
+cd orbiton
+sudo bash install.sh
 \`\`\`
 * Running the script will present the official interactive installation menu:
   * **Option [0]:** Install both Panel and Daemon (All-in-One on the same machine) — ideal for single VPS setup.
@@ -77,11 +77,11 @@ The Orbiton Panel runs on any VPS running Ubuntu 20.04 LTS or newer. It acts as 
 * Ports \`3000\` (HTTP) and \`3443\` (HTTPS - optional) open in your firewall.
 
 ### Quick Bash Installation
-Run the official unified script on your VPS:
+Clone the entire repository onto your VPS host and run the interactive bash installer:
 \`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/iamprmgvyt/orbiton/main/install.sh -o install.sh
-chmod +x install.sh
-sudo ./install.sh
+git clone https://github.com/iamprmgvyt/orbiton.git
+cd orbiton
+sudo bash install.sh
 \`\`\`
 *Select option **1** to install the **Orbiton Panel** only (or option **0** for All-in-One panel + daemon setup).*
 
