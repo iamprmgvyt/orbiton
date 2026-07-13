@@ -11,6 +11,7 @@ export default function Topbar({ activePage, onRefresh, onOpenSidebar }) {
     monitor: ['System Monitor', 'Detailed graphical performance metrics'],
     runtimes: ['Runtime', 'Installed compilers, runners and package managers'],
     users: ['Users Management', 'Configure access control and administrator roles'],
+    nodes: ['Nodes Management', 'Configure external Daemon host nodes and secure Master Keys'],
     settings: ['Settings', 'Customize security and profile settings'],
   };
 

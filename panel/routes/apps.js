@@ -142,12 +142,22 @@ router.get('/', async (req, res) => {
       `).all(req.user.id);
     }
 
-    const running = await daemonRequest('/api/apps/status').catch(() => ({}));
+    // Batch daemon status request per node
+    const nodesWithApps = [...new Set(apps.map(a => a.node_id || 1))];
+    const statusMap = {};
+
+    await Promise.all(nodesWithApps.map(async (nid) => {
+      try {
+        const running = await daemonRequest('/api/apps/status', 'GET', null, nid);
+        Object.assign(statusMap, running);
+      } catch (_) {}
+    }));
+
     apps = apps.map(a => ({
       ...a,
       env_vars:   JSON.parse(a.env_vars || '{}'),
-      liveStatus: running[a.id]?.status || a.status,
-      pid:        running[a.id]?.pid    || null,
+      liveStatus: statusMap[a.id]?.status || a.status,
+      pid:        statusMap[a.id]?.pid    || null,
     }));
 
     res.json(apps);
@@ -171,7 +181,7 @@ router.get('/runtimes', async (req, res) => {
 
 // ─── Create App ───────────────────────────────────────────────
 router.post('/', (req, res) => {
-  const { name, description, runtime, start_cmd, install_cmd, env_vars, max_ram, auto_restart, template } = req.body;
+  const { name, description, runtime, start_cmd, install_cmd, env_vars, max_ram, auto_restart, template, node_id } = req.body;
 
   let tpl = {};
   if (template && TEMPLATES[template]) {
@@ -182,6 +192,7 @@ router.post('/', (req, res) => {
   const finalCmd     = start_cmd?.trim() || tpl.start_cmd;
   const finalInstall = install_cmd !== undefined ? install_cmd.trim() : (tpl.install_cmd || '');
   const finalRuntime = runtime || tpl.runtime || 'custom';
+  const finalNodeId  = parseInt(node_id) || 1;
 
   if (!finalName || !finalCmd)
     return res.status(400).json({ error: 'name and start_cmd are required' });
@@ -191,8 +202,8 @@ router.post('/', (req, res) => {
 
   db.prepare(`
     INSERT INTO apps (id, name, description, runtime, start_cmd, install_cmd, work_dir,
-                      owner_id, env_vars, max_ram, auto_restart)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      owner_id, env_vars, max_ram, auto_restart, node_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     finalName,
@@ -204,7 +215,8 @@ router.post('/', (req, res) => {
     req.user.id,
     JSON.stringify(env_vars || {}),
     max_ram || tpl.max_ram || 512,
-    auto_restart ? 1 : 0
+    auto_restart ? 1 : 0,
+    finalNodeId
   );
 
   const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
@@ -215,7 +227,7 @@ router.post('/', (req, res) => {
 router.get('/:id', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
-  const status = await daemonRequest(`/api/apps/${app.id}/status`).catch(() => ({ status: 'stopped', pid: null }));
+  const status = await daemonRequest(`/api/apps/${app.id}/status`, 'GET', null, app.node_id).catch(() => ({ status: 'stopped', pid: null }));
   res.json({ ...app, env_vars: JSON.parse(app.env_vars || '{}'), ...status });
 });
 
@@ -225,7 +237,7 @@ router.patch('/:id', async (req, res) => {
   if (!app) return;
 
   const { name, description, runtime, start_cmd, install_cmd, env_vars, max_ram, auto_restart } = req.body;
-  const statusInfo = await daemonRequest(`/api/apps/${app.id}/status`).catch(() => ({ status: 'stopped' }));
+  const statusInfo = await daemonRequest(`/api/apps/${app.id}/status`, 'GET', null, app.node_id).catch(() => ({ status: 'stopped' }));
   if (statusInfo.status === 'running')
     return res.status(409).json({ error: 'Stop the application first before editing' });
 
@@ -260,8 +272,8 @@ router.delete('/:id', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
 
-  try { await daemonRequest(`/api/apps/${app.id}/stop`, 'POST'); } catch (_) {}
-  try { await daemonRequest(`/api/files/${app.id}/delete?path=/`, 'DELETE'); } catch (_) {}
+  try { await daemonRequest(`/api/apps/${app.id}/stop`, 'POST', null, app.node_id); } catch (_) {}
+  try { await daemonRequest(`/api/files/${app.id}/delete?path=/`, 'DELETE', null, app.node_id); } catch (_) {}
   
   db.prepare('DELETE FROM apps WHERE id = ?').run(app.id);
   res.json({ success: true });
@@ -273,7 +285,7 @@ router.post('/:id/start', async (req, res) => {
   if (!app) return;
   try {
     const appConfig = { ...app, env_vars: JSON.parse(app.env_vars || '{}') };
-    const result = await daemonRequest(`/api/apps/${app.id}/start`, 'POST', { appConfig });
+    const result = await daemonRequest(`/api/apps/${app.id}/start`, 'POST', { appConfig }, app.node_id);
     res.json({ success: true, ...result });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -282,7 +294,7 @@ router.post('/:id/stop', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
-    await daemonRequest(`/api/apps/${app.id}/stop`, 'POST');
+    await daemonRequest(`/api/apps/${app.id}/stop`, 'POST', null, app.node_id);
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -292,7 +304,7 @@ router.post('/:id/restart', async (req, res) => {
   if (!app) return;
   try {
     const appConfig = { ...app, env_vars: JSON.parse(app.env_vars || '{}') };
-    await daemonRequest(`/api/apps/${app.id}/restart`, 'POST', { appConfig });
+    await daemonRequest(`/api/apps/${app.id}/restart`, 'POST', { appConfig }, app.node_id);
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -301,7 +313,7 @@ router.post('/:id/kill', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
-    await daemonRequest(`/api/apps/${app.id}/kill`, 'POST');
+    await daemonRequest(`/api/apps/${app.id}/kill`, 'POST', null, app.node_id);
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -313,7 +325,7 @@ router.post('/:id/input', async (req, res) => {
   const { input } = req.body;
   if (input === undefined) return res.status(400).json({ error: 'input required' });
   try {
-    await daemonRequest(`/api/apps/${app.id}/input`, 'POST', { input });
+    await daemonRequest(`/api/apps/${app.id}/input`, 'POST', { input }, app.node_id);
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -323,7 +335,7 @@ router.get('/:id/logs', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
-    const data = await daemonRequest(`/api/apps/${app.id}/logs?lines=${req.query.lines || 200}`);
+    const data = await daemonRequest(`/api/apps/${app.id}/logs?lines=${req.query.lines || 200}`, 'GET', null, app.node_id);
     res.json(data);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -332,7 +344,7 @@ router.post('/:id/logs/clear', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
-    await daemonRequest(`/api/apps/${app.id}/logs/clear`, 'POST');
+    await daemonRequest(`/api/apps/${app.id}/logs/clear`, 'POST', null, app.node_id);
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -345,7 +357,7 @@ router.post('/:id/import/git', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'url required' });
 
   try {
-    await daemonRequest(`/api/apps/${app.id}/import/git`, 'POST', { url, branch, installCmd: app.install_cmd });
+    await daemonRequest(`/api/apps/${app.id}/import/git`, 'POST', { url, branch, installCmd: app.install_cmd }, app.node_id);
     db.prepare("UPDATE apps SET import_source = ? WHERE id = ?").run(`git:${url}`, app.id);
     res.json({ success: true, message: 'Git clone started' });
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -367,11 +379,22 @@ router.post('/:id/import/zip', zipUpload.single('file'), async (req, res) => {
     // Clean temp local file asynchronously
     fs.unlink(req.file.path, () => {});
 
+    // Resolve node configuration dynamic
+    let targetUrl = DAEMON_URL;
+    let targetToken = DAEMON_TOKEN;
+    if (app.node_id) {
+      const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(app.node_id);
+      if (node) {
+        targetUrl = `http://${node.ip.replace(/\/$/, '')}:${node.port}`;
+        targetToken = node.token;
+      }
+    }
+
     const fetch = globalThis.fetch;
-    const resDaemon = await fetch(`${DAEMON_URL}/api/apps/${app.id}/import/zip`, {
+    const resDaemon = await fetch(`${targetUrl}/api/apps/${app.id}/import/zip`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DAEMON_TOKEN}`
+        'Authorization': `Bearer ${targetToken}`
       },
       body: fd
     });
@@ -391,7 +414,7 @@ router.post('/:id/import/docker', async (req, res) => {
   if (!image) return res.status(400).json({ error: 'image required' });
 
   try {
-    await daemonRequest(`/api/apps/${app.id}/import/docker`, 'POST', { image });
+    await daemonRequest(`/api/apps/${app.id}/import/docker`, 'POST', { image }, app.node_id);
     db.prepare("UPDATE apps SET import_source = ?, start_cmd = ? WHERE id = ?")
       .run(`docker:${image}`, `docker run --rm ${image}`, app.id);
     res.json({ success: true, message: `Pulling ${image}...` });

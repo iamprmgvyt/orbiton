@@ -90,9 +90,46 @@ function initDatabase() {
     );
   `);
 
+  // Nodes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS nodes (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT    NOT NULL,
+      ip          TEXT    NOT NULL,
+      port        INTEGER NOT NULL DEFAULT 9900,
+      token       TEXT    NOT NULL,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
+  // Insert default local node if empty
+  try {
+    const count = db.prepare('SELECT COUNT(*) AS count FROM nodes').get().count;
+    if (count === 0) {
+      const daemonUrl = process.env.DAEMON_URL || 'http://localhost:9900';
+      let ip = '127.0.0.1';
+      let port = 9900;
+      try {
+        const u = new URL(daemonUrl);
+        ip = u.hostname;
+        port = parseInt(u.port) || 9900;
+      } catch (_) {}
+      
+      db.prepare(`
+        INSERT INTO nodes (name, ip, port, token)
+        VALUES (?, ?, ?, ?)
+      `).run('Local Node', ip, port, process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123');
+    }
+  } catch (_) {}
+
   // Migration: install_cmd
   try {
     db.exec("ALTER TABLE apps ADD COLUMN install_cmd TEXT DEFAULT '';");
+  } catch (_) {}
+
+  // Migration: node_id
+  try {
+    db.exec("ALTER TABLE apps ADD COLUMN node_id INTEGER DEFAULT 1;");
   } catch (_) {}
 
   console.log(`✅ Database: ${DB_PATH}`);

@@ -10,6 +10,7 @@ import Monitor from './pages/Monitor';
 import Runtimes from './pages/Runtimes';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import Nodes from './pages/Nodes';
 import { getToken, getUser, removeToken } from './utils/api';
 
 export default function App() {
@@ -144,6 +145,9 @@ export default function App() {
           )}
           {activePage === 'users' && (
             <Users currentUser={user} onRefreshTrigger={refreshTrigger} />
+          )}
+          {activePage === 'nodes' && (
+            <Nodes onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'settings' && (
             <Settings />

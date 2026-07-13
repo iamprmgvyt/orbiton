@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   Shield,
-  X
+  X,
+  HardDrive
 } from 'lucide-react';
 
 export default function Sidebar({ activePage, setActivePage, user, onLogout, isOpen, onClose }) {
@@ -22,6 +23,7 @@ export default function Sidebar({ activePage, setActivePage, user, onLogout, isO
   ];
 
   if (user && user.role === 'admin') {
+    menuItems.push({ id: 'nodes', label: 'Nodes', icon: HardDrive });
     menuItems.push({ id: 'users', label: 'Users Management', icon: Users });
   }
 

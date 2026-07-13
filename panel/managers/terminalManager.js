@@ -1,8 +1,5 @@
-// ============================================================
-// Orbiton Panel - Terminal Manager (Socket.IO Tunnel Client)
-// Proxy socket.io commands between client and daemon node.
-// ============================================================
 const { io } = require('socket.io-client');
+const { db } = require('../db/database');
 const { DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi');
 
 function setupSocketHandlers(ioServer) {
@@ -22,9 +19,25 @@ function setupSocketHandlers(ioServer) {
 
     // Client request to spin up pty
     socket.on('terminal:create', ({ appId, cols, rows } = {}) => {
+      let targetUrl = DAEMON_URL;
+      let targetToken = DAEMON_TOKEN;
+
+      if (appId) {
+        try {
+          const app = db.prepare('SELECT node_id FROM apps WHERE id = ?').get(appId);
+          if (app && app.node_id) {
+            const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(app.node_id);
+            if (node) {
+              targetUrl = `http://${node.ip.replace(/\/$/, '')}:${node.port}`;
+              targetToken = node.token;
+            }
+          }
+        } catch (_) {}
+      }
+
       // Connect to Daemon node
-      daemonSocket = io(DAEMON_URL, {
-        auth: { token: DAEMON_TOKEN },
+      daemonSocket = io(targetUrl, {
+        auth: { token: targetToken },
         reconnection: false
       });
 

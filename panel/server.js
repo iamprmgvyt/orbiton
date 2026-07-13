@@ -55,6 +55,7 @@ app.use('/api/auth',   authRoutes);
 app.use('/api/apps',   authMiddleware, appsRoutes);
 app.use('/api/files',  authMiddleware, fileRoutes);
 app.use('/api/system', authMiddleware, systemRoutes);
+app.use('/api/nodes',  authMiddleware, require('./routes/nodes'));
 
 // Catch-all → serve React frontend SPA index.html
 app.get('*', (req, res) => {

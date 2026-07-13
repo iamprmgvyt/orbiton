@@ -6,6 +6,8 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [nodes, setNodes] = useState([]);
+  const [selectedNodeId, setSelectedNodeId] = useState(1);
   
   // Form states
   const [appId, setAppId] = useState(null); // for editing
@@ -35,6 +37,8 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
       setApps(data);
       const tpls = await api('/apps/templates').catch(() => ({}));
       setTemplates(tpls);
+      const nodesData = await api('/nodes').catch(() => []);
+      setNodes(nodesData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -72,6 +76,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
     setDockerImage('');
     setSelectedTemplate('');
     setTplEnv('');
+    setSelectedNodeId(1);
     setIsModalOpen(true);
   };
 
@@ -141,6 +146,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
       auto_restart: autoRestart ? 1 : 0,
       env_vars: envObj,
       import_type: importType,
+      node_id: parseInt(selectedNodeId)
     };
 
     if (importType === 'git') {
@@ -299,7 +305,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
                 </div>
 
                 <div className="flex items-center justify-between border-t border-border/50 pt-4 mt-6" onClick={e => e.stopPropagation()}>
-                  <span className="text-[10px] text-muted font-mono">{app.id.slice(0, 8)}...</span>
+                  <span className="text-[10px] text-muted font-mono">Node {app.node_id || 1} • {app.id.slice(0, 8)}...</span>
                   <div className="flex gap-2">
                     {isRunning ? (
                       <>
@@ -388,6 +394,24 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
 
               {/* Form Content */}
               <div className="space-y-4">
+                {/* Node Daemon Selection */}
+                {!appId && nodes.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Deploy Host Node Daemon</label>
+                    <select
+                      value={selectedNodeId}
+                      onChange={e => setSelectedNodeId(e.target.value)}
+                      className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm font-semibold"
+                    >
+                      {nodes.map(n => (
+                        <option key={n.id} value={n.id}>
+                          {n.name} ({n.ip}:{n.port}) — {n.status.toUpperCase()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 {/* General Configs */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
