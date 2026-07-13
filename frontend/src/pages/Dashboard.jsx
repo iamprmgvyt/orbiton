@@ -143,7 +143,7 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
                   <th className="px-6 py-3.5">Name</th>
                   <th className="px-6 py-3.5">Runtime</th>
                   <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Command</th>
+                  <th className="px-6 py-3.5 hidden md:table-cell">Command</th>
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
@@ -178,7 +178,7 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
                           {app.liveStatus}
                         </span>
                       </td>
-                      <td className="px-6 py-4.5">
+                      <td className="px-6 py-4.5 hidden md:table-cell">
                         <code className="text-xs text-muted font-mono">{app.start_cmd.slice(0, 45)}</code>
                       </td>
                       <td className="px-6 py-4.5 text-right">
@@ -237,7 +237,7 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
       {/* Host System Info */}
       <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
         <h4 className="font-bold text-text mb-4">Host System details</h4>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {[
             ['OS Distro', `${stats?.os?.distro} ${stats?.os?.release}`],
             ['Hostname', stats?.os?.hostname],
