@@ -10,14 +10,21 @@ const crypto = require('crypto');
 const router = express.Router();
 
 // Initialize Postgres connection pool to Supabase
-const PG_CONNECTION_STRING = 'postgresql://postgres:RYVvgvtrgYH9zuN5@db.ylrvrgblyakssqfjkchg.supabase.co:5432/postgres';
-const pool = new Pool({
-  connectionString: PG_CONNECTION_STRING,
-  ssl: { rejectUnauthorized: false } // Necessary for Supabase SSL connections
-});
+const PG_CONNECTION_STRING = process.env.SUPABASE_DB_URL || '';
+let pool = null;
+
+if (PG_CONNECTION_STRING) {
+  pool = new Pool({
+    connectionString: PG_CONNECTION_STRING,
+    ssl: { rejectUnauthorized: false } // Necessary for Supabase SSL connections
+  });
+} else {
+  console.warn('⚠ SUPABASE_DB_URL is not configured in .env. Falling back entirely to SQLite for reviews.');
+}
 
 // Auto-create database table feedbacks on Supabase database if not exists
 async function initSupabaseTable() {
+  if (!pool) return;
   try {
     const client = await pool.connect();
     await client.query(`
@@ -41,6 +48,7 @@ initSupabaseTable();
 // GET /api/feedbacks - Public route to fetch community reviews
 router.get('/', async (req, res) => {
   try {
+    if (!pool) throw new Error('Supabase client pool is not initialized');
     const { rows } = await pool.query('SELECT * FROM feedbacks ORDER BY created_at DESC LIMIT 50');
     return res.json(rows);
   } catch (err) {
@@ -62,6 +70,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    if (!pool) throw new Error('Supabase client pool is not initialized');
     await pool.query(
       'INSERT INTO feedbacks (name, email, rating, message) VALUES ($1, $2, $3, $4)',
       [name, email, parseInt(rating) || 5, message]
