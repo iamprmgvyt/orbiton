@@ -181,8 +181,20 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
       {/* Detail Header */}
       <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-md">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-surface2 border border-border flex items-center justify-center text-3xl">
-            {app.runtime === 'nodejs' ? '🟩' : app.runtime === 'python3' ? '🐍' : app.runtime === 'java' ? '☕' : app.runtime === 'docker' ? '🐳' : '⚙️'}
+          <div className="w-14 h-14 rounded-2xl bg-surface2 border border-border flex items-center justify-center">
+            <img 
+              src={
+                app.runtime === 'nodejs' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg' :
+                app.runtime === 'python3' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg' :
+                app.runtime === 'java' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg' :
+                app.runtime === 'docker' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg' :
+                app.runtime === 'golang' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg' :
+                app.runtime === 'rust' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg' :
+                'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg'
+              } 
+              alt={app.runtime} 
+              className="w-8 h-8 object-contain" 
+            />
           </div>
           <div>
             <h3 className="text-xl font-bold text-text">{app.name}</h3>

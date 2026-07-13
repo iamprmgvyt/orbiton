@@ -204,14 +204,15 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
 
   const getRuntimeIcon = (r) => {
     const icons = {
-      nodejs: '🟩',
-      python3: '🐍',
-      java: '☕',
-      docker: '🐳',
-      golang: '🔵',
-      rust: '🦀'
+      nodejs: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg',
+      python3: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
+      java: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg',
+      docker: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
+      golang: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg',
+      rust: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg'
     };
-    return icons[r] || '⚙️';
+    const src = icons[r] || 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg';
+    return <img src={src} alt={r} className="w-5 h-5 object-contain" />;
   };
 
   if (loading) {
