@@ -157,7 +157,7 @@ SSL_PORT=3443
 JWT_SECRET=${JWT_SECRET}
 NODE_ENV=production
 DISABLE_SSL=true
-DAEMON_URL=http://localhost:8080
+DAEMON_URL=http://localhost:9900
 DAEMON_TOKEN=${DAEMON_TOKEN}
 EOF
   chmod 600 "$PANEL_DIR/.env"
@@ -212,7 +212,7 @@ install_daemon() {
   fi
 
   cat > "$DAEMON_DIR/.env" << EOF
-PORT=8080
+PORT=9900
 DAEMON_TOKEN=${DAEMON_TOKEN}
 DATA_DIR=${DATA_DIR}
 NODE_ENV=production
@@ -244,7 +244,7 @@ EOF
   systemctl daemon-reload
   systemctl enable orbiton-daemon --quiet
   systemctl start orbiton-daemon
-  echo -e "${GREEN}✔ Orbiton Daemon (Wings) started on port 8080!${NC}"
+  echo -e "${GREEN}✔ Orbiton Daemon (Wings) started on port 9900!${NC}"
 }
 
 uninstall_orbiton() {

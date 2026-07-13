@@ -24,7 +24,7 @@ const zipUpload = multer({
   limits: { fileSize: 500 * 1024 * 1024 }
 });
 
-const PORT = parseInt(process.env.PORT || '8080');
+const PORT = parseInt(process.env.PORT || '9900');
 const DAEMON_TOKEN = process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123';
 
 app.use(helmet());

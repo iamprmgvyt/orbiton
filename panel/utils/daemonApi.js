@@ -1,4 +1,4 @@
-const DAEMON_URL = process.env.DAEMON_URL || 'http://localhost:8080';
+const DAEMON_URL = process.env.DAEMON_URL || 'http://localhost:9900';
 const DAEMON_TOKEN = process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123';
 
 async function daemonRequest(endpoint, method = 'GET', body = null) {
