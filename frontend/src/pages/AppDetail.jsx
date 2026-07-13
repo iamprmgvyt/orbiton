@@ -275,10 +275,10 @@ export default function AppDetail({ appId, initialTab = 'logs', onBack, onRefres
       </div>
 
       {/* Tab Panels */}
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl relative min-h-[350px]">
+      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl relative min-h-[350px] max-w-full overflow-hidden">
         {/* Logs Tab */}
         {activeTab === 'logs' && (
-          <div className="space-y-4">
+          <div className="space-y-4 max-w-full">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted">Process execution logs output (last 500 lines)</span>
               <button
@@ -289,10 +289,10 @@ export default function AppDetail({ appId, initialTab = 'logs', onBack, onRefres
                 Clear Logs
               </button>
             </div>
-            <div className="w-full bg-[#030307] border border-border/80 rounded-xl p-4 font-mono text-xs text-text2 h-[400px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
+            <div className="w-full bg-[#030307] border border-border/80 rounded-xl p-4 font-mono text-xs text-text2 h-[400px] overflow-y-auto whitespace-pre-wrap break-all leading-relaxed">
               {logs.length ? (
                 logs.map((log, index) => (
-                  <div key={index} className="py-0.5 border-b border-border/5 last:border-0 hover:bg-white/5 transition-colors">
+                  <div key={index} className="py-0.5 border-b border-border/5 last:border-0 hover:bg-white/5 transition-colors break-all">
                     {log}
                   </div>
                 ))
