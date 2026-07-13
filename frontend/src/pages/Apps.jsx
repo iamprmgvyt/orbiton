@@ -215,6 +215,21 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
     return <img src={src} alt={r} className="w-5 h-5 object-contain" />;
   };
 
+  const getTemplateIcon = (key, t) => {
+    const urls = {
+      nodejs_generic: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg',
+      python_generic: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
+      java_generic: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg',
+      discord_js: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg',
+      discord_py: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
+      express_api: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg',
+      fastapi: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/fastapi/fastapi-original.svg',
+      minecraft: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg'
+    };
+    const src = urls[key] || 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg';
+    return <img src={src} alt={t.name} className="w-6 h-6 object-contain mx-auto mb-1.5" />;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -457,7 +472,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
                               : 'border-border bg-bg hover:border-border2'
                           }`}
                         >
-                          <span className="text-xl block mb-1">{t.icon || '📦'}</span>
+                          {getTemplateIcon(key, t)}
                           <span className="text-xs font-semibold text-text block">{t.name}</span>
                         </div>
                       ))}

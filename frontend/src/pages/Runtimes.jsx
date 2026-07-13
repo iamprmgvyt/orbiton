@@ -22,11 +22,32 @@ export default function Runtimes({ onRefreshTrigger }) {
     loadRuntimes();
   }, [onRefreshTrigger]);
 
-  const icons = {
-    nodejs: '🟩', npm: '📦', python3: '🐍', pip3: '📦', java: '☕',
-    docker: '🐳', git: '🔀', curl: '🌐', wget: '⬇️', gradle: '🏗️',
-    mvn: '🏗️', go: '🔵', rust: '🦀', deno: '🦕', bun: '🥟',
-    php: '🐘', ruby: '💎', perl: '🐪', lua: '🌙', bash: '🔧'
+  const getIcon = (key) => {
+    const urls = {
+      nodejs: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg',
+      npm: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/npm/npm-original-wordmark.svg',
+      python3: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
+      pip3: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
+      java: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg',
+      docker: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
+      git: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/git/git-original.svg',
+      curl: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg',
+      wget: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/linux/linux-original.svg',
+      gradle: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/gradle/gradle-original.svg',
+      mvn: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/maven/maven-original.svg',
+      go: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg',
+      rust: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg',
+      deno: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/denojs/denojs-original.svg',
+      bun: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/bun/bun-original.svg',
+      php: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/php/php-original.svg',
+      ruby: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/ruby/ruby-original.svg',
+      perl: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/perl/perl-original.svg',
+      lua: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/lua/lua-original.svg',
+      bash: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/bash/bash-original.svg'
+    };
+
+    const src = urls[key] || 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg';
+    return <img src={src} alt={key} className="w-6 h-6 object-contain" />;
   };
 
   if (loading) {
@@ -54,7 +75,9 @@ export default function Runtimes({ onRefreshTrigger }) {
                 : 'bg-surface border-border hover:border-border2'
             }`}
           >
-            <span className="text-3xl">{icons[key] || '⚙️'}</span>
+            <div className="w-11 h-11 rounded-xl bg-surface2 border border-border flex items-center justify-center flex-shrink-0">
+              {getIcon(key)}
+            </div>
             <div className="overflow-hidden">
               <span className="block font-bold text-sm text-text truncate">{r.name}</span>
               <span className={`block text-[10px] mt-0.5 truncate font-semibold ${r.installed ? 'text-green-400' : 'text-muted'}`}>
