@@ -242,7 +242,20 @@ io.on('connection', (socket) => {
   });
 });
 
+function printBanner(port, token) {
+  const logo = `
+\x1b[34m\x1b[1m   ___   ____   ____   _  _____  ___   _   _ 
+  / _ \\\\ |  _ \\\\ |  _ \\\\ | ||_   _|/ _ \\\\ | \\\\ | |
+ | | | || |_) || |_) || |  | | | | | ||  \\\\| |
+ | |_| ||  _ < |  _ < | |  | | | |_| || |\\\\  |
+  \\\\___/ |_| \\\\_\\|_| \\\\_\\|_|  |_|  \\\\___/ |_| \\\\_\x1b[0m
+  
+🪐 \x1b[32mOrbiton Daemon (Wings) is running on port ${port}!\x1b[0m
+   \x1b[33mSecure Token: ${token}\x1b[0m
+`;
+  console.log(logo);
+}
+
 server.listen(PORT, () => {
-  console.log(`\n🪐 Orbiton Daemon (Wings) is running on port ${PORT}!`);
-  console.log(`   Secure Token: ${DAEMON_TOKEN}\n`);
+  printBanner(PORT, DAEMON_TOKEN);
 });

@@ -71,6 +71,19 @@ let   io, primaryServer;
 
 const ioOptions = { cors: { origin: '*' }, maxHttpBufferSize: 1e8 };
 
+function printBanner(port, ssl = false) {
+  const logo = `
+\x1b[34m\x1b[1m   ___   ____   ____   _  _____  ___   _   _ 
+  / _ \\\\ |  _ \\\\ |  _ \\\\ | ||_   _|/ _ \\\\ | \\\\ | |
+ | | | || |_) || |_) || |  | | | | | ||  \\\\| |
+ | |_| ||  _ < |  _ < | |  | | | |_| || |\\\\  |
+  \\\\___/ |_| \\\\_\\|_| \\\\_\\|_|  |_|  \\\\___/ |_| \\\\_\x1b[0m
+  
+🪐 \x1b[32mOrbiton Panel is running on ${ssl ? 'HTTPS' : 'HTTP'} port ${port}!\x1b[0m
+`;
+  console.log(logo);
+}
+
 if (hasSSL) {
   const sslOpts = {
     cert: fs.readFileSync(CERT_FILE),
@@ -80,8 +93,7 @@ if (hasSSL) {
   io = new Server(httpsServer, ioOptions);
   setupSocketHandlers(io);
 
-  httpsServer.listen(SSL_PORT, () =>
-    console.log(`🔒 Orbiton Panel HTTPS → https://localhost:${SSL_PORT}`));
+  httpsServer.listen(SSL_PORT, () => printBanner(SSL_PORT, true));
 
   // Redirect HTTP → HTTPS
   http.createServer((req, res) => {
@@ -96,8 +108,7 @@ if (hasSSL) {
   io = new Server(httpServer, ioOptions);
   setupSocketHandlers(io);
 
-  httpServer.listen(PORT, () =>
-    console.log(`🪐 Orbiton Panel HTTP → http://localhost:${PORT}`));
+  httpServer.listen(PORT, () => printBanner(PORT, false));
 
   primaryServer = httpServer;
 }
