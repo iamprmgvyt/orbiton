@@ -2,9 +2,10 @@
 // Orbiton Daemon - Process Manager (Cross-platform)
 // Manages application processes locally without database.
 // ============================================================
-const { spawn, exec } = require('child_process');
+const { exec } = require('child_process');
 const path = require('path');
 const fs   = require('fs');
+const pty  = require('node-pty');
 
 const MAX_LOG_LINES = 500;
 const IS_WIN        = process.platform === 'win32';
@@ -21,6 +22,12 @@ function setIO(io) { ioInstance = io; }
 
 function emit(event, data) {
   if (ioInstance) ioInstance.emit(event, data);
+}
+
+function emitTerminalData(appId, data) {
+  if (ioInstance) {
+    ioInstance.to(`terminal:${appId}`).emit('terminal:data', { data });
+  }
 }
 
 function getAppDir(appId) {
@@ -61,12 +68,12 @@ function startApp(appId, appConfig) {
     updateStatus(appId, 'starting');
     appendLog(appId, `\x1b[36m<<[OrbitonDaemon]>> Step 1/2: Running installation command: ${installCmd}\x1b[0m\n`);
 
-    const installProc = spawn(installCmd, [], {
+    const installProc = pty.spawn(IS_WIN ? 'powershell.exe' : 'bash', IS_WIN ? ['-NoProfile', '-Command', installCmd] : ['-c', installCmd], {
+      name: 'xterm-color',
+      cols: 80,
+      rows: 24,
       cwd: workDir,
-      env,
-      shell: true,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
+      env
     });
 
     const entry = {
@@ -79,31 +86,26 @@ function startApp(appId, appConfig) {
     };
     processes.set(appId, entry);
 
-    installProc.stdout.on('data', (data) => appendLog(appId, data.toString()));
-    installProc.stderr.on('data', (data) => appendLog(appId, `\x1b[31m${data.toString()}\x1b[0m`));
+    installProc.onData((data) => {
+      appendLog(appId, data.toString());
+      emitTerminalData(appId, data.toString());
+    });
 
-    installProc.on('close', (code) => {
+    installProc.on('exit', (code) => {
       const current = processes.get(appId);
       // Check if it was stopped/killed during installation
       if (!current || current.status === 'stopped' || current.status === 'stopping') return;
 
       if (code === 0) {
         appendLog(appId, `\x1b[32m<<[OrbitonDaemon]>> Step 2/2: Installation complete! Launching startup command: ${startCmd}\x1b[0m\n`);
+        emitTerminalData(appId, `\x1b[32m<<[OrbitonDaemon]>> Step 2/2: Installation complete! Launching startup command: ${startCmd}\x1b[0m\r\n`);
         launchStartupCmd(appId, appConfig, workDir, env);
       } else {
         appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> Installation failed with code ${code}. Startup aborted.\x1b[0m\n`);
+        emitTerminalData(appId, `\x1b[31m<<[OrbitonDaemon Error]>> Installation failed with code ${code}. Startup aborted.\x1b[0m\r\n`);
         current.status = 'stopped';
         updateStatus(appId, 'stopped');
       }
-    });
-
-    installProc.on('error', (err) => {
-      const current = processes.get(appId);
-      if (!current || current.status === 'stopped' || current.status === 'stopping') return;
-
-      appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> Installation process error: ${err.message}\x1b[0m\n`);
-      current.status = 'stopped';
-      updateStatus(appId, 'stopped');
     });
 
     return { pid: installProc.pid };
@@ -117,12 +119,13 @@ function startApp(appId, appConfig) {
 
 function launchStartupCmd(appId, appConfig, workDir, env) {
   const startCmd = appConfig.start_cmd.trim();
-  const proc = spawn(startCmd, [], {
-    cwd:   workDir,
-    env,
-    shell: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-    windowsHide: true,
+  
+  const proc = pty.spawn(IS_WIN ? 'powershell.exe' : 'bash', IS_WIN ? ['-NoProfile', '-Command', startCmd] : ['-c', startCmd], {
+    name: 'xterm-color',
+    cols: 80,
+    rows: 24,
+    cwd:  workDir,
+    env
   });
 
   const entry = {
@@ -136,17 +139,22 @@ function launchStartupCmd(appId, appConfig, workDir, env) {
   processes.set(appId, entry);
   updateStatus(appId, 'running');
 
-  proc.stdout.on('data', (data) => appendLog(appId, data.toString()));
-  proc.stderr.on('data', (data) => appendLog(appId, `\x1b[31m${data.toString()}\x1b[0m`));
+  proc.onData((data) => {
+    appendLog(appId, data.toString());
+    emitTerminalData(appId, data.toString());
+  });
 
-  proc.on('close', (code) => {
+  proc.on('exit', (code) => {
     appendLog(appId, `\x1b[33m<<[OrbitonDaemon]>> Process exited (code ${code})\x1b[0m\n`);
+    emitTerminalData(appId, `\x1b[33m<<[OrbitonDaemon]>> Process exited (code ${code})\x1b[0m\r\n`);
+    
     if (processes.has(appId)) processes.get(appId).status = 'stopped';
     updateStatus(appId, 'stopped');
 
     // Auto-restart
     if (appConfig.auto_restart && code !== 0) {
       appendLog(appId, `\x1b[33m<<[OrbitonDaemon]>> Auto-restarting in 5s...\x1b[0m\n`);
+      emitTerminalData(appId, `\x1b[33m<<[OrbitonDaemon]>> Auto-restarting in 5s...\x1b[0m\r\n`);
       setTimeout(() => { 
         try { 
           const current = processes.get(appId);
@@ -156,11 +164,6 @@ function launchStartupCmd(appId, appConfig, workDir, env) {
         } catch (_) {} 
       }, 5000);
     }
-  });
-
-  proc.on('error', (err) => {
-    appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> ${err.message}\x1b[0m\n`);
-    updateStatus(appId, 'error');
   });
 
   return { pid: proc.pid };
@@ -365,10 +368,15 @@ function clearLogs(appId) {
   } catch (_) {}
 }
 
+function getAppProcess(appId) {
+  const entry = processes.get(appId);
+  return entry && (entry.status === 'running' || entry.status === 'starting') ? entry.process : null;
+}
+
 module.exports = {
   setIO,
   startApp, stopApp, restartApp, killApp, sendInput,
   importFromGit, importFromZip, pullDockerImage,
   getAppStatus, getRunningApps, getLogs, getAppDir,
-  stopAll, clearLogs,
+  stopAll, clearLogs, getAppProcess,
 };

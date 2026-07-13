@@ -274,6 +274,27 @@ io.on('connection', (socket) => {
   let ptyProcess = null;
 
   socket.on('terminal:create', ({ appId, cols, rows }) => {
+    // 1. If application is active (running/starting), attach to its live PTY
+    const appProc = appId ? processManager.getAppProcess(appId) : null;
+    if (appProc) {
+      socket.join(`terminal:${appId}`);
+      try { appProc.resize(cols || 80, rows || 24); } catch (_) {}
+
+      socket.on('terminal:input', ({ input }) => {
+        const activeProc = processManager.getAppProcess(appId);
+        if (activeProc) activeProc.write(input);
+      });
+
+      socket.on('terminal:resize', ({ cols: c, rows: r }) => {
+        const activeProc = processManager.getAppProcess(appId);
+        if (activeProc) {
+          try { activeProc.resize(c, r); } catch (_) {}
+        }
+      });
+      return;
+    }
+
+    // 2. If app is offline, create a temporary PTY shell for directory management
     if (ptyProcess) return;
 
     const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
@@ -301,8 +322,10 @@ io.on('connection', (socket) => {
       if (ptyProcess) ptyProcess.write(input);
     });
 
-    socket.on('terminal:resize', ({ cols, rows }) => {
-      if (ptyProcess) ptyProcess.resize(cols, rows);
+    socket.on('terminal:resize', ({ cols: c, rows: r }) => {
+      if (ptyProcess) {
+        try { ptyProcess.resize(c, r); } catch (_) {}
+      }
     });
   });
 
