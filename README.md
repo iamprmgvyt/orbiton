@@ -9,6 +9,7 @@ Lightweight, self-hosted panel to manage any application — Node.js, Python, Ja
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-blue.svg)]()
+[![Installs](https://img.shields.io/badge/dynamic/json?color=blueviolet&label=Installs&query=count&url=https%3A%2F%2Fapi.counterapi.dev%2Fv1%2Forbiton%2Finstall)](https://github.com/iamprmgvyt/orbiton)
 
 </div>
 

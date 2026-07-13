@@ -293,17 +293,24 @@ while [ "$done" == false ]; do
     action=0
   fi
 
+  send_telemetry() {
+    curl -s "https://api.counterapi.dev/v1/orbiton/install/up" >/dev/null 2>&1 &
+  }
+
   case "$action" in
     0)
+      send_telemetry
       install_panel
       install_daemon
       done=true
       ;;
     1)
+      send_telemetry
       install_panel
       done=true
       ;;
     2)
+      send_telemetry
       install_daemon
       done=true
       ;;
