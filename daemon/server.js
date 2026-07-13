@@ -174,23 +174,203 @@ app.get('/api/system/processes', (req, res) => {
   res.json({ list: [] });
 });
 
+const runtimeInstalls = new Map();
+
 app.get('/api/system/runtimes', (req, res) => {
   const result = {
-    nodejs: { name: 'Node.js', installed: true, version: process.version },
-    npm:    { name: 'npm', installed: true, version: '10.x' },
-    docker: { name: 'Docker', installed: false, version: '' }
+    nodejs:  { name: 'Node.js', installed: true, version: process.version },
+    npm:     { name: 'npm', installed: false, version: '' },
+    python3: { name: 'Python 3', installed: false, version: '' },
+    pip3:    { name: 'pip3', installed: false, version: '' },
+    java:    { name: 'Java (OpenJDK)', installed: false, version: '' },
+    docker:  { name: 'Docker', installed: false, version: '' },
+    git:     { name: 'Git', installed: false, version: '' },
+    gradle:  { name: 'Gradle', installed: false, version: '' },
+    mvn:     { name: 'Maven', installed: false, version: '' },
+    go:      { name: 'Golang', installed: false, version: '' },
+    rust:    { name: 'Rust', installed: false, version: '' },
+    deno:    { name: 'Deno', installed: false, version: '' },
+    bun:     { name: 'Bun', installed: false, version: '' },
+    php:     { name: 'PHP', installed: false, version: '' },
+    ruby:    { name: 'Ruby', installed: false, version: '' },
+    perl:    { name: 'Perl', installed: false, version: '' },
+    lua:     { name: 'Lua', installed: false, version: '' },
+    bash:    { name: 'Bash', installed: true, version: '5.x' }
   };
-  // detect docker
-  const check = execSyncCheck('docker --version');
-  if (check) { result.docker.installed = true; result.docker.version = check; }
+
+  const checkVersion = (cmd) => {
+    try {
+      return require('child_process').execSync(cmd + ' 2>&1', { stdio: 'pipe' }).toString().trim().split('\n')[0];
+    } catch (_) { return null; }
+  };
+
+  const npmV = checkVersion('npm --version');
+  if (npmV) { result.npm.installed = true; result.npm.version = npmV; }
+
+  const pyV = checkVersion('python3 --version');
+  if (pyV) { result.python3.installed = true; result.python3.version = pyV.replace('Python ', ''); }
+
+  const pipV = checkVersion('pip3 --version');
+  if (pipV) { result.pip3.installed = true; result.pip3.version = pipV.split(' ')[1] || 'installed'; }
+
+  const javaV = checkVersion('java -version');
+  if (javaV) {
+    result.java.installed = true;
+    const match = javaV.match(/version "([^"]+)"/);
+    result.java.version = match ? match[1] : 'installed';
+  }
+
+  const dockerV = checkVersion('docker --version');
+  if (dockerV) { result.docker.installed = true; result.docker.version = dockerV.replace('Docker version ', '').split(',')[0]; }
+
+  const gitV = checkVersion('git --version');
+  if (gitV) { result.git.installed = true; result.git.version = gitV.replace('git version ', ''); }
+
+  const gradleV = checkVersion('gradle --version');
+  if (gradleV) {
+    result.gradle.installed = true;
+    const match = gradleV.match(/Gradle\s+([^\s]+)/);
+    result.gradle.version = match ? match[1] : 'installed';
+  }
+
+  const mvnV = checkVersion('mvn --version');
+  if (mvnV) {
+    result.mvn.installed = true;
+    const match = mvnV.match(/Apache Maven\s+([^\s]+)/);
+    result.mvn.version = match ? match[1] : 'installed';
+  }
+
+  const goV = checkVersion('go version');
+  if (goV) {
+    result.go.installed = true;
+    const match = goV.match(/go1\.[^\s]+/);
+    result.go.version = match ? match[0] : 'installed';
+  }
+
+  const rustV = checkVersion('rustc --version');
+  if (rustV) { result.rust.installed = true; result.rust.version = rustV.split(' ')[1] || 'installed'; }
+
+  const denoV = checkVersion('deno --version');
+  if (denoV) { result.deno.installed = true; result.deno.version = denoV.split('\n')[0].replace('deno ', ''); }
+
+  const bunV = checkVersion('bun --version');
+  if (bunV) { result.bun.installed = true; result.bun.version = bunV; }
+
+  const phpV = checkVersion('php --version');
+  if (phpV) {
+    result.php.installed = true;
+    const match = phpV.match(/PHP\s+([^\s\(\)]+)/);
+    result.php.version = match ? match[1] : 'installed';
+  }
+
+  const rubyV = checkVersion('ruby --version');
+  if (rubyV) {
+    result.ruby.installed = true;
+    const match = rubyV.match(/ruby\s+([^\s]+)/);
+    result.ruby.version = match ? match[1] : 'installed';
+  }
+
+  const perlV = checkVersion('perl -v');
+  if (perlV) {
+    result.perl.installed = true;
+    const match = perlV.match(/v([0-9\.]+)/);
+    result.perl.version = match ? match[1] : 'installed';
+  }
+
+  const luaV = checkVersion('lua -v');
+  if (luaV) { result.lua.installed = true; result.lua.version = luaV.replace('Lua ', ''); }
+
+  const bashV = checkVersion('bash --version');
+  if (bashV) {
+    result.bash.installed = true;
+    const match = bashV.match(/version\s+([^\s]+)/);
+    result.bash.version = match ? match[1] : '5.x';
+  }
+
+  for (const [key, state] of runtimeInstalls.entries()) {
+    if (result[key]) {
+      result[key].isInstalling = (state.status === 'installing');
+      result[key].installStatus = state.status;
+      result[key].installError = state.error;
+    }
+  }
+
   res.json(result);
 });
 
-function execSyncCheck(cmd) {
-  try {
-    return require('child_process').execSync(cmd, { stdio: 'pipe' }).toString().trim();
-  } catch (_) { return null; }
-}
+app.post('/api/system/runtimes/install', (req, res) => {
+  const { runtime } = req.body;
+  if (!runtime) return res.status(400).json({ error: 'Runtime identifier required' });
+
+  if (runtimeInstalls.get(runtime)?.status === 'installing') {
+    return res.json({ success: true, message: 'Installation already in progress' });
+  }
+
+  const installCmds = {
+    nodejs:  'curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs',
+    npm:     'sudo apt-get update && sudo apt-get install -y npm',
+    python3: 'sudo apt-get update && sudo apt-get install -y python3 python3-pip python3-venv',
+    pip3:    'sudo apt-get update && sudo apt-get install -y python3-pip',
+    java:    'sudo apt-get update && sudo apt-get install -y openjdk-17-jdk',
+    docker:  'curl -fsSL https://get.docker.com | sh',
+    git:     'sudo apt-get update && sudo apt-get install -y git',
+    gradle:  'sudo apt-get update && sudo apt-get install -y gradle',
+    mvn:     'sudo apt-get update && sudo apt-get install -y maven',
+    go:      'sudo apt-get update && sudo apt-get install -y golang-go',
+    rust:    'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y',
+    deno:    'curl -fsSL https://deno.land/x/install/install.sh | sh && sudo ln -sf /root/.deno/bin/deno /usr/local/bin/deno',
+    bun:     'curl -fsSL https://bun.sh/install | bash && sudo ln -sf /root/.bun/bin/bun /usr/local/bin/bun',
+    php:     'sudo apt-get update && sudo apt-get install -y php-cli php-curl php-json php-common',
+    ruby:    'sudo apt-get update && sudo apt-get install -y ruby-full',
+    perl:    'sudo apt-get update && sudo apt-get install -y perl',
+    lua:     'sudo apt-get update && sudo apt-get install -y lua5.3'
+  };
+
+  const cmd = installCmds[runtime];
+  if (!cmd) return res.status(400).json({ error: `Installation command for ${runtime} is not defined` });
+
+  runtimeInstalls.set(runtime, { status: 'installing', error: null });
+
+  const dataDir = process.env.DATA_DIR || '/opt/orbiton-data';
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  const logFile = path.join(dataDir, `runtime-install-${runtime}.log`);
+  fs.writeFileSync(logFile, `🪐 Starting installation of ${runtime} at ${new Date().toISOString()}\nLệnh thực thi: ${cmd}\n\n`);
+
+  const { spawn } = require('child_process');
+  const child = spawn(cmd, [], { shell: true, env: process.env });
+
+  child.stdout.on('data', (data) => {
+    fs.appendFileSync(logFile, data.toString());
+  });
+
+  child.stderr.on('data', (data) => {
+    fs.appendFileSync(logFile, data.toString());
+  });
+
+  child.on('close', (code) => {
+    if (code === 0) {
+      runtimeInstalls.set(runtime, { status: 'success', error: null });
+      fs.appendFileSync(logFile, `\n🪐 Installation completed successfully!\n`);
+    } else {
+      runtimeInstalls.set(runtime, { status: 'failed', error: `Exit code ${code}` });
+      fs.appendFileSync(logFile, `\n🪐 Installation failed with exit code ${code}.\n`);
+    }
+  });
+
+  res.json({ success: true, message: 'Installation started' });
+});
+
+app.get('/api/system/runtimes/install/log', (req, res) => {
+  const { runtime } = req.query;
+  if (!runtime) return res.status(400).json({ error: 'Runtime required' });
+  const dataDir = process.env.DATA_DIR || '/opt/orbiton-data';
+  const logFile = path.join(dataDir, `runtime-install-${runtime}.log`);
+  if (!fs.existsSync(logFile)) {
+    return res.json({ log: 'No installation log found.' });
+  }
+  const content = fs.readFileSync(logFile, 'utf8');
+  res.json({ log: content });
+});
 
 // GET /api/system/firewall - List open ports
 app.get('/api/system/firewall', (req, res) => {

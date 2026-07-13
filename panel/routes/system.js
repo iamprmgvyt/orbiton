@@ -61,4 +61,24 @@ router.post('/firewall/close', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// POST /api/system/runtimes/install
+router.post('/runtimes/install', async (req, res) => {
+  try {
+    const data = await daemonRequest('/api/system/runtimes/install', 'POST', req.body);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/system/runtimes/install/log
+router.get('/runtimes/install/log', async (req, res) => {
+  try {
+    const data = await daemonRequest(`/api/system/runtimes/install/log?runtime=${req.query.runtime}`);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
