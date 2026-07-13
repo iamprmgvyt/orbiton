@@ -104,14 +104,36 @@ generate_ssl() {
 }
 
 letsencrypt_ssl() {
+  echo -n "* Do you use Cloudflare SSL/TLS Proxy (Flexible/Full) for this domain? (y/N): "
+  read -r cf_ssl
+  if [[ "$cf_ssl" =~ [Yy] ]]; then
+    echo -e "${GREEN}✔ Configuring for Cloudflare Proxy. Orbiton will run on HTTP (port 3000) behind Cloudflare HTTPS.${NC}"
+    # Ensure DISABLE_SSL=true in .env
+    sed -i 's/DISABLE_SSL=false/DISABLE_SSL=true/g' "$PANEL_DIR/.env" 2>/dev/null || true
+    # Remove any local certs to prevent auto SSL activation
+    rm -rf "$PANEL_DIR/certs"
+    systemctl restart orbiton-panel
+    echo -e "${GREEN}✔ Configuration completed! Make sure Cloudflare SSL/TLS mode is set to 'Flexible'.${NC}"
+    return
+  fi
+
+  # Otherwise install Let's Encrypt
   apt-get install -y -qq certbot >> $LOG_PATH 2>&1
   read -rp "  Domain (e.g. panel.example.com): " le_domain
   read -rp "  Email: " le_email
   certbot certonly --standalone -d "$le_domain" --email "$le_email" --agree-tos --non-interactive >> $LOG_PATH 2>&1
-  mkdir -p "$PANEL_DIR/certs"
-  ln -sf "/etc/letsencrypt/live/$le_domain/fullchain.pem" "$PANEL_DIR/certs/fullchain.pem"
-  ln -sf "/etc/letsencrypt/live/$le_domain/privkey.pem"   "$PANEL_DIR/certs/privkey.pem"
-  echo -e "${GREEN}✔ Let's Encrypt certificate configured for ${le_domain}${NC}"
+  
+  if [ -d "/etc/letsencrypt/live/$le_domain" ]; then
+    mkdir -p "$PANEL_DIR/certs"
+    ln -sf "/etc/letsencrypt/live/$le_domain/fullchain.pem" "$PANEL_DIR/certs/fullchain.pem"
+    ln -sf "/etc/letsencrypt/live/$le_domain/privkey.pem"   "$PANEL_DIR/certs/privkey.pem"
+    # Enable SSL in .env
+    sed -i 's/DISABLE_SSL=true/DISABLE_SSL=false/g' "$PANEL_DIR/.env" 2>/dev/null || true
+    systemctl restart orbiton-panel
+    echo -e "${GREEN}✔ Let's Encrypt certificate configured and SSL enabled for ${le_domain}${NC}"
+  else
+    echo -e "${RED}❌ Let's Encrypt certificate generation failed! Check log: $LOG_PATH${NC}"
+  fi
 }
 
 install_panel() {
