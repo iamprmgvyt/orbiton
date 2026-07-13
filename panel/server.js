@@ -58,8 +58,6 @@ app.use('/api/system', authMiddleware, systemRoutes);
 app.use('/api/nodes',  authMiddleware, require('./routes/nodes'));
 
 // Catch-all → serve React frontend SPA index.html
-app.use('/api/feedbacks', require('./routes/feedbacks'));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(FRONTEND, 'index.html'));
 });

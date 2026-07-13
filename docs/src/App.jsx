@@ -25,17 +25,8 @@ function FeedbackForm() {
   const [submitted, setSubmitted] = useState(false);
   const [allFeedbacks, setAllFeedbacks] = useState([]);
 
-  const PANEL_API_URL = import.meta.env.VITE_PANEL_API_URL || '';
-
   const loadFeedbacks = async () => {
     try {
-      if (PANEL_API_URL) {
-        const res = await fetch(`${PANEL_API_URL}/feedbacks`);
-        if (!res.ok) throw new Error('Failed to fetch from Panel API');
-        const data = await res.json();
-        setAllFeedbacks(data || []);
-        return;
-      }
       const { data, error } = await supabase
         .from('feedbacks')
         .select('*')
@@ -60,19 +51,9 @@ function FeedbackForm() {
     const newFeedback = { name, email, rating, message };
     
     try {
-      if (PANEL_API_URL) {
-        const res = await fetch(`${PANEL_API_URL}/feedbacks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newFeedback)
-        });
-        if (!res.ok) throw new Error('Failed to save to Panel API');
-        setSubmitted(true);
-      } else {
-        const { error } = await supabase.from('feedbacks').insert([newFeedback]);
-        if (error) throw error;
-        setSubmitted(true);
-      }
+      const { error } = await supabase.from('feedbacks').insert([newFeedback]);
+      if (error) throw error;
+      setSubmitted(true);
     } catch (err) {
       console.warn('Save failed. Saving to localStorage:', err.message);
       const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
