@@ -34,14 +34,14 @@ fi
 
 welcome() {
   echo -e "${BLUE}${BOLD}"
-  echo "    ____       _     _ _             "
-  echo "   / __ \\     | |   (_) |            "
-  echo "  | |  | |_ __| |__  _| |_ ___  _ __ "
-  echo "  | |  | | '__| '_ \\| | __/ _ \\| '_ \\"
-  echo "  | |__| | |  | |_) | | || (_) | | | |"
-  echo "   \\____/|_|  |_.__/|_|\\__\\___/|_| |_|"
+  echo "  ______   .______      .______    __  ___________.  ______   .__   __. "
+  echo " /  __  \\  |   _  \\     |   _  \\  |  | |           | /  __  \\  |  \\ |  | "
+  echo "|  |  |  | |  |_)  |    |  |_)  | |  | \`---|  |---`|  |  |  | |   \\|  | "
+  echo "|  |  |  | |      /     |   _  <  |  |     |  |     |  |  |  | |  . \`  | "
+  echo "|  \`--'  | |  |\\  \\----.|  |_)  | |  |     |  |     |  \`--'  | |  |\\   | "
+  echo " \\______/  | _| \`._____||______/  |__|     |__|      \\______/  |__| \\__| "
   echo -e "${NC}"
-  echo -e "${YELLOW}   — CLI Auto Installer (Ubuntu 22/24 LTS) —${NC}\n"
+  echo -e "${YELLOW}               — CLI Auto Installer (Ubuntu 22/24 LTS) —${NC}\n"
 }
 
 
@@ -245,7 +245,7 @@ uninstall_orbiton() {
     echo -e "${GREEN}✔ Application data removed.${NC}"
   fi
   echo -e "${GREEN}✔ Orbiton uninstalled successfully!${NC}"
-  echo -e "${YELLOW}Thank you for using Orbiton! Cảm ơn bạn đã tin dùng Orbiton!${NC}\n"
+  echo -e "${YELLOW}Thank you for using Orbiton!${NC}\n"
   exit 0
 }
 
@@ -307,4 +307,4 @@ PUBLIC_IP=$(curl -s4 ifconfig.me || curl -s4 api.ipify.org || hostname -I | awk 
 echo -e "  Panel Access:  ${BOLD}http://${PUBLIC_IP}:3000${NC}"
 echo -e "  Default Admin: ${BOLD}Set up on first web browser access${NC}"
 echo -e "  Log file:      ${BOLD}$LOG_PATH${NC}"
-echo -e "  ${YELLOW}Thank you for choosing Orbiton! Cảm ơn bạn đã tin dùng Orbiton!${NC}\n"
+echo -e "  ${YELLOW}Thank you for choosing Orbiton!${NC}\n"
