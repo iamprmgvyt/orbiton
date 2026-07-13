@@ -141,7 +141,7 @@ export default function Nodes({ onRefreshTrigger }) {
           <button
             onClick={() => {
               setModalOpen(true);
-              generateRandomToken();
+              setToken('');
             }}
             className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-sm py-2.5 px-4 rounded-xl transition-all flex items-center gap-2 shadow-lg shadow-accent/15"
           >
