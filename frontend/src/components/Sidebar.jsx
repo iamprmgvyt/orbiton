@@ -16,7 +16,6 @@ export default function Sidebar({ activePage, setActivePage, user, onLogout }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'apps', label: 'Applications', icon: Server },
-    { id: 'terminal', label: 'AIO Terminal', icon: Terminal },
     { id: 'files', label: 'File Manager', icon: FolderOpen },
     { id: 'monitor', label: 'System Monitor', icon: Activity },
     { id: 'runtimes', label: 'Runtime Detector', icon: Cpu },

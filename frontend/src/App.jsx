@@ -45,7 +45,7 @@ export default function App() {
         setActivePage('app-detail');
       } else if (path === '/dashboard') {
         setActivePage('dashboard');
-      } else if (['/apps', '/terminal', '/files', '/monitor', '/runtimes', '/users', '/settings'].includes(path)) {
+      } else if (['/apps', '/files', '/monitor', '/runtimes', '/users', '/settings'].includes(path)) {
         setActivePage(path.substring(1));
       } else {
         setActivePage('dashboard');
