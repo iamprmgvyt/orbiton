@@ -59,7 +59,7 @@ function startApp(appId, appConfig) {
   // If there is an install command, run it first!
   if (installCmd) {
     updateStatus(appId, 'starting');
-    appendLog(appId, `\x1b[36m[Orbiton] Step 1/2: Running installation command: ${installCmd}\x1b[0m\n`);
+    appendLog(appId, `\x1b[36m<<[OrbitonDaemon]>> Step 1/2: Running installation command: ${installCmd}\x1b[0m\n`);
 
     const installProc = spawn(installCmd, [], {
       cwd: workDir,
@@ -88,10 +88,10 @@ function startApp(appId, appConfig) {
       if (!current || current.status === 'stopped' || current.status === 'stopping') return;
 
       if (code === 0) {
-        appendLog(appId, `\x1b[32m[Orbiton] Step 2/2: Installation complete! Launching startup command: ${startCmd}\x1b[0m\n`);
+        appendLog(appId, `\x1b[32m<<[OrbitonDaemon]>> Step 2/2: Installation complete! Launching startup command: ${startCmd}\x1b[0m\n`);
         launchStartupCmd(appId, appConfig, workDir, env);
       } else {
-        appendLog(appId, `\x1b[31m[Orbiton Error] Installation failed with code ${code}. Startup aborted.\x1b[0m\n`);
+        appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> Installation failed with code ${code}. Startup aborted.\x1b[0m\n`);
         current.status = 'stopped';
         updateStatus(appId, 'stopped');
       }
@@ -101,7 +101,7 @@ function startApp(appId, appConfig) {
       const current = processes.get(appId);
       if (!current || current.status === 'stopped' || current.status === 'stopping') return;
 
-      appendLog(appId, `\x1b[31m[Orbiton Error] Installation process error: ${err.message}\x1b[0m\n`);
+      appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> Installation process error: ${err.message}\x1b[0m\n`);
       current.status = 'stopped';
       updateStatus(appId, 'stopped');
     });
@@ -140,13 +140,13 @@ function launchStartupCmd(appId, appConfig, workDir, env) {
   proc.stderr.on('data', (data) => appendLog(appId, `\x1b[31m${data.toString()}\x1b[0m`));
 
   proc.on('close', (code) => {
-    appendLog(appId, `\x1b[33m[Orbiton] Process exited (code ${code})\x1b[0m\n`);
+    appendLog(appId, `\x1b[33m<<[OrbitonDaemon]>> Process exited (code ${code})\x1b[0m\n`);
     if (processes.has(appId)) processes.get(appId).status = 'stopped';
     updateStatus(appId, 'stopped');
 
     // Auto-restart
     if (appConfig.auto_restart && code !== 0) {
-      appendLog(appId, `\x1b[33m[Orbiton] Auto-restarting in 5s...\x1b[0m\n`);
+      appendLog(appId, `\x1b[33m<<[OrbitonDaemon]>> Auto-restarting in 5s...\x1b[0m\n`);
       setTimeout(() => { 
         try { 
           const current = processes.get(appId);
@@ -159,7 +159,7 @@ function launchStartupCmd(appId, appConfig, workDir, env) {
   });
 
   proc.on('error', (err) => {
-    appendLog(appId, `\x1b[31m[Orbiton Error] ${err.message}\x1b[0m\n`);
+    appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> ${err.message}\x1b[0m\n`);
     updateStatus(appId, 'error');
   });
 
@@ -209,7 +209,7 @@ function sendInput(appId, input) {
 async function runInstallCmd(appId, installCmd) {
   if (!installCmd || !installCmd.trim()) return;
   const dir = getAppDir(appId);
-  appendLog(appId, `\x1b[36m[Orbiton] Running install command: ${installCmd}\x1b[0m\n`);
+  appendLog(appId, `\x1b[36m<<[OrbitonDaemon]>> Running install command: ${installCmd}\x1b[0m\n`);
   
   return new Promise((resolve) => {
     const proc = spawn(installCmd, [], {
@@ -224,14 +224,14 @@ async function runInstallCmd(appId, installCmd) {
     
     proc.on('close', (code) => {
       if (code === 0) {
-        appendLog(appId, `\x1b[32m[Orbiton] Install completed successfully!\x1b[0m\n`);
+        appendLog(appId, `\x1b[32m<<[OrbitonDaemon]>> Install completed successfully!\x1b[0m\n`);
       } else {
-        appendLog(appId, `\x1b[31m[Orbiton] Install failed with code ${code}\x1b[0m\n`);
+        appendLog(appId, `\x1b[31m<<[OrbitonDaemon]>> Install failed with code ${code}\x1b[0m\n`);
       }
       resolve();
     });
     proc.on('error', (err) => {
-      appendLog(appId, `\x1b[31m[Orbiton Error] Install failed: ${err.message}\x1b[0m\n`);
+      appendLog(appId, `\x1b[31m<<[OrbitonDaemon Error]>> Install failed: ${err.message}\x1b[0m\n`);
       resolve();
     });
   });
@@ -243,14 +243,14 @@ async function importFromGit(appId, gitUrl, branch = '', installCmd = '') {
   return new Promise((resolve, reject) => {
     const branchFlag = branch ? `-b ${branch}` : '';
     const cmd = `git clone ${branchFlag} "${gitUrl}" .`;
-    appendLog(appId, `\x1b[36m[Orbiton] Cloning: ${gitUrl}\x1b[0m\n`);
+    appendLog(appId, `\x1b[36m<<[OrbitonDaemon]>> Cloning: ${gitUrl}\x1b[0m\n`);
 
     exec(cmd, { cwd: dir, timeout: 120000 }, (err, stdout, stderr) => {
       if (err) {
         appendLog(appId, `\x1b[31m[Git Error] ${err.message}\x1b[0m\n`);
         return reject(err);
       }
-      appendLog(appId, `\x1b[32m[Orbiton] Clone complete!\x1b[0m\n`);
+      appendLog(appId, `\x1b[32m<<[OrbitonDaemon]>> Clone complete!\x1b[0m\n`);
       resolve({ success: true });
       if (installCmd) runInstallCmd(appId, installCmd);
     });
@@ -261,7 +261,7 @@ async function importFromGit(appId, gitUrl, branch = '', installCmd = '') {
 async function importFromZip(appId, zipPath, installCmd = '') {
   const unzipper = require('unzipper');
   const dir = getAppDir(appId);
-  appendLog(appId, `\x1b[36m[Orbiton] Extracting ZIP...\x1b[0m\n`);
+  appendLog(appId, `\x1b[36m<<[OrbitonDaemon]>> Extracting ZIP...\x1b[0m\n`);
 
   await new Promise((resolve, reject) => {
     fs.createReadStream(zipPath)
@@ -272,7 +272,7 @@ async function importFromZip(appId, zipPath, installCmd = '') {
 
   try { fs.unlinkSync(zipPath); } catch (_) {}
 
-  appendLog(appId, `\x1b[32m[Orbiton] ZIP extracted!\x1b[0m\n`);
+  appendLog(appId, `\x1b[32m<<[OrbitonDaemon]>> ZIP extracted!\x1b[0m\n`);
   if (installCmd) runInstallCmd(appId, installCmd);
   return { success: true };
 }
@@ -280,13 +280,13 @@ async function importFromZip(appId, zipPath, installCmd = '') {
 // ─── Pull Docker Image ────────────────────────────────────────
 async function pullDockerImage(appId, image) {
   return new Promise((resolve, reject) => {
-    appendLog(appId, `\x1b[36m[Orbiton] Pulling Docker image: ${image}\x1b[0m\n`);
+    appendLog(appId, `\x1b[36m<<[OrbitonDaemon]>> Pulling Docker image: ${image}\x1b[0m\n`);
     exec(`docker pull ${image}`, { timeout: 300000 }, (err, stdout, stderr) => {
       if (err) {
         appendLog(appId, `\x1b[31m[Docker Error] ${err.message}\x1b[0m\n`);
         return reject(err);
       }
-      appendLog(appId, `\x1b[32m[Orbiton] Image pulled: ${image}\x1b[0m\n`);
+      appendLog(appId, `\x1b[32m<<[OrbitonDaemon]>> Image pulled: ${image}\x1b[0m\n`);
       resolve({ success: true });
     });
   });
