@@ -14,8 +14,19 @@ Orbiton is a next-generation, lightweight, and open-source server management pan
 * **Central Master Panel:** A unified dashboard to manage users, nodes, and deploy presets.
 * **Isolated Node Daemons (Wings):** Nodes are fully decoupled, running on an asynchronous, event-driven Node.js runtime.
 * **Realtime PTY Stream:** Full terminal logs stream instantly through TTY without output buffer delays.
-* **Global Runtime Shop:** Seamlessly install, detect, or uninstall compiler environments (Node, Python, Java, Docker, Go, Rust, PHP, Bun, Deno...) directly via the Web UI.
-* **AIO Secure Firewall:** Manage firewall ports and security rules with ease.
+* **Global Runtime Shop:** Seamlessly install, detect, or uninstall compiler environments (Node, Python, Java, Go, Rust...) directly via the Web UI.
+
+### Quick Start Installation (Bash)
+You can set up both the Orbiton Master Panel and Daemon Nodes using our official unified bash script on your VPS:
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/iamprmgvyt/orbiton/main/install.sh -o install.sh
+chmod +x install.sh
+sudo ./install.sh
+\`\`\`
+* Running the script will present an interactive menu:
+  * **Option 1:** Installs the Orbiton Web Panel (central dashboard).
+  * **Option 2:** Installs the Orbiton Daemon Node (wings worker) on target host machines.
+  * **Option 3:** Installs the compiler Runtimes (Node, Python, Java, Docker, Go, etc.) for app compiling.
     `
   },
   {
