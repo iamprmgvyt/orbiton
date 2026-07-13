@@ -2,19 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { api, fmtBytes } from '../utils/api';
 import { Play, Square, RotateCw, Terminal, Edit3, Trash2, Cpu, HardDrive } from 'lucide-react';
 
-export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
+export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
   const [stats, setStats] = useState(null);
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isAdmin = user?.role === 'admin';
 
   const loadData = async () => {
     try {
-      const [statsData, appsData] = await Promise.all([
-        api('/system/stats'),
-        api('/apps')
-      ]);
-      setStats(statsData);
-      setApps(appsData);
+      if (isAdmin) {
+        const [statsData, appsData] = await Promise.all([
+          api('/system/stats'),
+          api('/apps')
+        ]);
+        setStats(statsData);
+        setApps(appsData);
+      } else {
+        const appsData = await api('/apps');
+        setApps(appsData);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -24,7 +30,7 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
 
   useEffect(() => {
     loadData();
-  }, [onRefreshTrigger]);
+  }, [onRefreshTrigger, user]);
 
   const handleAction = async (e, appId, action) => {
     e.stopPropagation();
@@ -59,69 +65,71 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
 
   return (
     <div className="space-y-6">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* CPU */}
-        <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">CPU Usage</span>
-            <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-              <Cpu className="w-4.5 h-4.5" />
+      {/* Stats Grid (Only for Admin) */}
+      {isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* CPU */}
+          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-bold text-muted uppercase tracking-wider">CPU Usage</span>
+              <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+                <Cpu className="w-4.5 h-4.5" />
+              </div>
+            </div>
+            <div className="text-3xl font-extrabold text-text">{stats?.cpu?.usage}%</div>
+            <p className="text-[10px] text-muted truncate mt-1">{stats?.cpu?.model || 'Detecting...'}</p>
+            <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
+              <div className="bg-yellow-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.cpu?.usage || 0}%` }}></div>
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-text">{stats?.cpu?.usage}%</div>
-          <p className="text-[10px] text-muted truncate mt-1">{stats?.cpu?.model || 'Detecting...'}</p>
-          <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
-            <div className="bg-yellow-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.cpu?.usage || 0}%` }}></div>
-          </div>
-        </div>
 
-        {/* RAM */}
-        <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">RAM Usage</span>
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
-              <Cpu className="w-4.5 h-4.5" />
+          {/* RAM */}
+          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-bold text-muted uppercase tracking-wider">RAM Usage</span>
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
+                <Cpu className="w-4.5 h-4.5" />
+              </div>
+            </div>
+            <div className="text-3xl font-extrabold text-text">{stats?.memory?.usedPercent}%</div>
+            <p className="text-[10px] text-muted truncate mt-1">
+              {stats?.memory ? `${fmtBytes(stats.memory.used)} / ${fmtBytes(stats.memory.total)}` : 'Detecting...'}
+            </p>
+            <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
+              <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.memory?.usedPercent || 0}%` }}></div>
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-text">{stats?.memory?.usedPercent}%</div>
-          <p className="text-[10px] text-muted truncate mt-1">
-            {stats?.memory ? `${fmtBytes(stats.memory.used)} / ${fmtBytes(stats.memory.total)}` : 'Detecting...'}
-          </p>
-          <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
-            <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.memory?.usedPercent || 0}%` }}></div>
-          </div>
-        </div>
 
-        {/* Disk */}
-        <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Disk space</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-              <HardDrive className="w-4.5 h-4.5" />
+          {/* Disk */}
+          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-bold text-muted uppercase tracking-wider">Disk space</span>
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                <HardDrive className="w-4.5 h-4.5" />
+              </div>
+            </div>
+            <div className="text-3xl font-extrabold text-text">{stats?.disk?.[0]?.usedPercent}%</div>
+            <p className="text-[10px] text-muted truncate mt-1">
+              {stats?.disk?.[0] ? `${fmtBytes(stats.disk[0].used)} / ${fmtBytes(stats.disk[0].size)}` : 'Detecting...'}
+            </p>
+            <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
+              <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.disk?.[0]?.usedPercent || 0}%` }}></div>
             </div>
           </div>
-          <div className="text-3xl font-extrabold text-text">{stats?.disk?.[0]?.usedPercent}%</div>
-          <p className="text-[10px] text-muted truncate mt-1">
-            {stats?.disk?.[0] ? `${fmtBytes(stats.disk[0].used)} / ${fmtBytes(stats.disk[0].size)}` : 'Detecting...'}
-          </p>
-          <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
-            <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.disk?.[0]?.usedPercent || 0}%` }}></div>
-          </div>
-        </div>
 
-        {/* Running Apps */}
-        <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-bold text-muted uppercase tracking-wider">Running Apps</span>
-            <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
-              <span className="text-sm font-bold">🚀</span>
+          {/* Running Apps */}
+          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-xs font-bold text-muted uppercase tracking-wider">Running Apps</span>
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
+                <span className="text-sm font-bold">🚀</span>
+              </div>
             </div>
+            <div className="text-3xl font-extrabold text-text">{runningApps}</div>
+            <p className="text-[10px] text-muted mt-1">of {apps.length} total applications</p>
           </div>
-          <div className="text-3xl font-extrabold text-text">{runningApps}</div>
-          <p className="text-[10px] text-muted mt-1">of {apps.length} total applications</p>
         </div>
-      </div>
+      )}
 
       {/* Apps Table */}
       <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-xl">
@@ -190,14 +198,14 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
                                 title="Stop Application"
                                 className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors"
                               >
-                                <Square className="w-3.5 h-3.5" />
+                                <Square className="w-3.5 h-3.5 text-yellow-500" />
                               </button>
                               <button
                                 onClick={e => handleAction(e, app.id, 'restart')}
                                 title="Restart Application"
                                 className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
                               >
-                                <RotateCw className="w-3.5 h-3.5" />
+                                <RotateCw className="w-3.5 h-3.5 text-accent" />
                               </button>
                             </>
                           ) : (
@@ -206,7 +214,7 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
                               title="Start Application"
                               className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors"
                             >
-                              <Play className="w-3.5 h-3.5" />
+                              <Play className="w-3.5 h-3.5 text-green-500" />
                             </button>
                           )}
                           <button
@@ -214,14 +222,14 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
                             title="Terminal Console"
                             className="p-2 rounded-lg bg-surface2 hover:bg-border text-text2 transition-colors"
                           >
-                            <Terminal className="w-3.5 h-3.5" />
+                            <Terminal className="w-3.5 h-3.5 text-text2" />
                           </button>
                           <button
                             onClick={e => handleDelete(e, app.id)}
                             title="Delete Application"
                             className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
                           </button>
                         </div>
                       </td>
@@ -234,25 +242,27 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger }) {
         )}
       </div>
 
-      {/* Host System Info */}
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
-        <h4 className="font-bold text-text mb-4">Host System details</h4>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {[
-            ['OS Distro', `${stats?.os?.distro} ${stats?.os?.release}`],
-            ['Hostname', stats?.os?.hostname],
-            ['Architecture', stats?.os?.arch],
-            ['CPU Cores', stats?.cpu?.cores],
-            ['Uptime', stats?.os?.uptime ? `${Math.floor(stats.os.uptime / 3600)} hours` : 'Detecting...'],
-            ['Load Average', stats?.cpu?.load?.map(l => l.toFixed(2)).join(', ') || 'N/A']
-          ].map(([k, v], i) => (
-            <div key={i} className="bg-bg2/40 border border-border/40 rounded-xl p-3.5">
-              <span className="block text-[10px] text-muted uppercase font-bold tracking-wider">{k}</span>
-              <span className="block text-sm font-semibold text-text mt-1">{v}</span>
-            </div>
-          ))}
+      {/* Host System Info (Only for Admin) */}
+      {isAdmin && (
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
+          <h4 className="font-bold text-text mb-4">Host System details</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              ['OS Distro', `${stats?.os?.distro} ${stats?.os?.release}`],
+              ['Hostname', stats?.os?.hostname],
+              ['Architecture', stats?.os?.arch],
+              ['CPU Cores', stats?.cpu?.cores],
+              ['Uptime', stats?.os?.uptime ? `${Math.floor(stats.os.uptime / 3600)} hours` : 'Detecting...'],
+              ['Load Average', stats?.cpu?.load?.map(l => l.toFixed(2)).join(', ') || 'N/A']
+            ].map(([k, v], i) => (
+              <div key={i} className="bg-bg2/40 border border-border/40 rounded-xl p-3.5">
+                <span className="block text-[10px] text-muted uppercase font-bold tracking-wider">{k}</span>
+                <span className="block text-sm font-semibold text-text mt-1">{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

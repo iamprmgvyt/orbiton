@@ -59,6 +59,16 @@ export default function App() {
     return () => window.removeEventListener('popstate', handleRouting);
   }, [user]);
 
+  // Client Security Route Shield (Redirect non-admin away from forbidden routes)
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      const forbidden = ['nodes', 'users', 'monitor', 'runtimes'];
+      if (forbidden.includes(activePage)) {
+        setActivePage('dashboard');
+      }
+    }
+  }, [activePage, user]);
+
   const handlePageChange = (pageId) => {
     setActivePage(pageId);
     history.pushState({ page: pageId }, '', `/${pageId}`);
@@ -121,7 +131,7 @@ export default function App() {
 
         <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
           {activePage === 'dashboard' && (
-            <Dashboard onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} />
+            <Dashboard onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} />
           )}
           {activePage === 'apps' && (
             <Apps onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} />

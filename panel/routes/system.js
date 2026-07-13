@@ -7,6 +7,14 @@ const { daemonRequest } = require('../utils/daemonApi');
 
 const router = express.Router();
 
+// Middleware: Admin access control for system-level APIs
+router.use((req, res, next) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({ error: 'Administrator role required to access host system APIs.' });
+  }
+  next();
+});
+
 // GET /api/system/stats
 router.get('/stats', async (req, res) => {
   try {
