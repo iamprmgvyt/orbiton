@@ -73,6 +73,19 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
     setIsModalOpen(true);
   };
 
+  const handleRuntimeChange = (val) => {
+    setRuntime(val);
+    const defaults = {
+      nodejs: 'node index.js',
+      python3: 'python3 app.py',
+      java: 'java -jar server.jar',
+      golang: 'go run main.go',
+      rust: 'cargo run',
+      custom: 'echo "Hello Orbiton"'
+    };
+    setStartCmd(defaults[val] || 'node index.js');
+  };
+
   const handleOpenEdit = (e, app) => {
     e.stopPropagation();
     setAppId(app.id);
@@ -378,7 +391,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
                       <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Runtime Environment</label>
                       <select
                         value={runtime}
-                        onChange={e => setRuntime(e.target.value)}
+                        onChange={e => handleRuntimeChange(e.target.value)}
                         className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
                       >
                         <option value="nodejs">Node.js</option>

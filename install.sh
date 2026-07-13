@@ -245,6 +245,8 @@ uninstall_orbiton() {
     echo -e "${GREEN}✔ Application data removed.${NC}"
   fi
   echo -e "${GREEN}✔ Orbiton uninstalled successfully!${NC}"
+  echo -e "${YELLOW}Thank you for using Orbiton! Cảm ơn bạn đã tin dùng Orbiton!${NC}\n"
+  exit 0
 }
 
 welcome
@@ -303,5 +305,6 @@ echo -e "${GREEN}${BOLD}🪐 Orbiton Setup Completed Successfully!        ${NC}"
 echo -e "${GREEN}${BOLD}================================================${NC}"
 PUBLIC_IP=$(curl -s4 ifconfig.me || curl -s4 api.ipify.org || hostname -I | awk '{print $1}')
 echo -e "  Panel Access:  ${BOLD}http://${PUBLIC_IP}:3000${NC}"
-echo -e "  Default Admin: ${BOLD}admin / admin123${NC}"
-echo -e "  Log file:      ${BOLD}$LOG_PATH${NC}\n"
+echo -e "  Default Admin: ${BOLD}Set up on first web browser access${NC}"
+echo -e "  Log file:      ${BOLD}$LOG_PATH${NC}"
+echo -e "  ${YELLOW}Thank you for choosing Orbiton! Cảm ơn bạn đã tin dùng Orbiton!${NC}\n"
