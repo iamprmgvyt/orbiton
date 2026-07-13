@@ -17,16 +17,19 @@ Orbiton is a next-generation, lightweight, and open-source server management pan
 * **Global Runtime Shop:** Seamlessly install, detect, or uninstall compiler environments (Node, Python, Java, Go, Rust...) directly via the Web UI.
 
 ### Quick Start Installation (Bash)
-You can set up both the Orbiton Master Panel and Daemon Nodes using our official unified bash script on your VPS:
+You can set up Orbiton Panel and Daemon Nodes using our official unified bash script on your VPS:
 \`\`\`bash
 curl -fsSL https://raw.githubusercontent.com/iamprmgvyt/orbiton/main/install.sh -o install.sh
 chmod +x install.sh
 sudo ./install.sh
 \`\`\`
-* Running the script will present an interactive menu:
-  * **Option 1:** Installs the Orbiton Web Panel (central dashboard).
-  * **Option 2:** Installs the Orbiton Daemon Node (wings worker) on target host machines.
-  * **Option 3:** Installs the compiler Runtimes (Node, Python, Java, Docker, Go, etc.) for app compiling.
+* Running the script will present the official interactive installation menu:
+  * **Option [0]:** Install both Panel and Daemon (All-in-One on the same machine) — ideal for single VPS setup.
+  * **Option [1]:** Install Panel only (Central UI & User Database) — deploy this on your main control server.
+  * **Option [2]:** Install Daemon only (Wings Agent on Node VPS) — deploy this on external worker nodes.
+  * **Option [3]:** Configure Let's Encrypt SSL certificate — automatically generate and assign SSL to secure panel domain.
+  * **Option [4]:** Uninstall Panel & Daemon — completely purge all folders, databases, and systemd services.
+  * **Option [5]:** Cancel / Exit — cancel the installation.
     `
   },
   {
@@ -80,7 +83,7 @@ curl -fsSL https://raw.githubusercontent.com/iamprmgvyt/orbiton/main/install.sh 
 chmod +x install.sh
 sudo ./install.sh
 \`\`\`
-*Select option **1** to install the Orbiton Panel.*
+*Select option **1** to install the **Orbiton Panel** only (or option **0** for All-in-One panel + daemon setup).*
 
 ### Manual Setup
 If you prefer setting up manually:
