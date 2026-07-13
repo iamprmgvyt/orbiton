@@ -282,6 +282,7 @@ while [ "$done" == false ]; do
     "Install Daemon only (Wings Agent on Node VPS)"
     "Configure Let's Encrypt SSL certificate"
     "Uninstall Panel & Daemon"
+    "Cancel / Exit"
   )
 
   for i in "${!options[@]}"; do
@@ -323,6 +324,10 @@ while [ "$done" == false ]; do
     4)
       uninstall_orbiton
       done=true
+      ;;
+    5)
+      echo -e "${YELLOW}Installation cancelled. Thank you for using Orbiton!${NC}\n"
+      exit 0
       ;;
     *)
       echo -e "${RED}Invalid selection${NC}"
