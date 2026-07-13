@@ -43,7 +43,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     
     socket.on('app:status', ({ appId: statusAppId, status }) => {
       if (statusAppId === appId) {
-        setApp(prev => prev ? { ...prev, liveStatus: status, status } : null);
+        setApp(prev => prev ? { ...prev, status } : null);
       }
     });
 
@@ -165,7 +165,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     );
   }
 
-  const isRunning = app.liveStatus === 'running' || app.liveStatus === 'starting';
+  const isRunning = app.status === 'running' || app.status === 'starting';
 
   return (
     <div className="space-y-6">
@@ -189,16 +189,16 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
             <p className="text-xs text-muted mt-1">{app.description || 'No description provided'}</p>
             <div className="flex items-center gap-3 mt-3">
               <span className={`inline-flex items-center gap-1.5 font-bold uppercase tracking-wider text-[9px] px-2.5 py-1 rounded-full border ${
-                app.liveStatus === 'running'
+                app.status === 'running'
                   ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                  : app.liveStatus === 'starting'
+                  : app.status === 'starting' || app.status === 'stopping'
                   ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
                   : 'bg-red-500/10 border-red-500/20 text-red-400'
               }`}>
-                <span className={`w-1 h-1 rounded-full ${
-                  app.liveStatus === 'running' ? 'bg-green-400 animate-pulse' : app.liveStatus === 'starting' ? 'bg-yellow-400' : 'bg-red-400'
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  app.status === 'running' ? 'bg-green-400 animate-pulse' : app.status === 'starting' ? 'bg-yellow-400 animate-spin' : 'bg-red-400'
                 }`}></span>
-                {app.liveStatus}
+                {app.status === 'running' ? 'RUNNING' : app.status === 'starting' ? 'STARTING' : app.status === 'stopping' ? 'STOPPING' : 'OFFLINE'}
               </span>
               {app.pid && <span className="text-[10px] text-muted font-semibold uppercase tracking-wider bg-surface2 border border-border px-2.5 py-1 rounded-full">PID: {app.pid}</span>}
             </div>
