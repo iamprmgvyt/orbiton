@@ -46,15 +46,6 @@ export default function Nodes({ onRefreshTrigger }) {
     loadNodes();
   }, [onRefreshTrigger]);
 
-  const generateRandomToken = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-';
-    let result = 'orbiton_daemon_secret_';
-    for (let i = 0; i < 32; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setToken(result);
-  };
-
   const handleCreateNode = async (e) => {
     e.preventDefault();
     if (!name || !ip || !port || !token) return alert('All fields are required.');
@@ -319,21 +310,14 @@ export default function Nodes({ onRefreshTrigger }) {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold tracking-wider text-muted mb-1.5 flex justify-between">
-                  <span>Secure Token (Master Key)</span>
-                  <button
-                    type="button"
-                    onClick={generateRandomToken}
-                    className="text-accent hover:underline lowercase font-semibold"
-                  >
-                    Generate Random Key
-                  </button>
+                <label className="block text-[10px] uppercase font-bold tracking-wider text-muted mb-1.5">
+                  Secure Token (Master Key)
                 </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     required
-                    placeholder="Enter or generate your secure master key token..."
+                    placeholder="Enter your secure master key token..."
                     value={token}
                     onChange={e => setToken(e.target.value)}
                     className="w-full bg-surface2 border border-border focus:border-accent text-white font-mono rounded-xl px-4 py-2.5 text-sm outline-none transition-all shadow-inner"
