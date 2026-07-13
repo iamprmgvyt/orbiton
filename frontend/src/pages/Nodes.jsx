@@ -333,10 +333,10 @@ export default function Nodes({ onRefreshTrigger }) {
                   <input
                     type="text"
                     required
-                    placeholder="Master key to connect securely"
+                    placeholder="Enter or generate your secure master key token..."
                     value={token}
                     onChange={e => setToken(e.target.value)}
-                    className="w-full bg-bg border border-border rounded-xl px-4 py-2.5 text-sm text-text font-mono focus:border-accent outline-none"
+                    className="w-full bg-surface2 border border-border focus:border-accent text-white font-mono rounded-xl px-4 py-2.5 text-sm outline-none transition-all shadow-inner"
                   />
                 </div>
               </div>
