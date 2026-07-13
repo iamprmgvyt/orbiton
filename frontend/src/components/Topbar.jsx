@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshCw, Menu } from 'lucide-react';
 
-export default function Topbar({ activePage, onRefresh }) {
+export default function Topbar({ activePage, onRefresh, onOpenSidebar }) {
   const TITLES = {
     dashboard: ['Dashboard', 'System overview and core statistics'],
     apps: ['Applications', 'Manage all your self-hosted services'],
@@ -20,7 +20,7 @@ export default function Topbar({ activePage, onRefresh }) {
     <header className="h-16 border-b border-border bg-bg/80 backdrop-blur-md flex items-center justify-between px-6 sticky top-0 z-30">
       {/* Mobile Toggle & Titles */}
       <div className="flex items-center gap-4">
-        <button className="md:hidden p-2 rounded-xl border border-border text-text2 hover:bg-surface hover:text-text">
+        <button onClick={onOpenSidebar} className="md:hidden p-2 rounded-xl border border-border text-text2 hover:bg-surface hover:text-text transition-all">
           <Menu className="w-5 h-5" />
         </button>
         <div>

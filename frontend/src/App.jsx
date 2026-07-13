@@ -17,6 +17,7 @@ export default function App() {
   const [tokenChecked, setTokenChecked] = useState(false);
   const [activePage, setActivePage] = useState('dashboard');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // AppDetail state
   const [selectedAppId, setSelectedAppId] = useState(null);
@@ -105,11 +106,17 @@ export default function App() {
         setActivePage={handlePageChange}
         user={user}
         onLogout={handleLogout}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       {/* Main Content Area */}
       <div className="flex-1 pl-0 md:pl-64 flex flex-col min-h-screen">
-        <Topbar activePage={activePage} onRefresh={handleRefresh} />
+        <Topbar
+          activePage={activePage}
+          onRefresh={handleRefresh}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+        />
 
         <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
           {activePage === 'dashboard' && (
