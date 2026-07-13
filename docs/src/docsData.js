@@ -287,5 +287,47 @@ Execute power state actions on an application process.
 }
 \`\`\`
     `
+  },
+  {
+    id: 'contributing',
+    category: 'Community',
+    title: 'Contributing Guide',
+    content: `
+# Contributing to Orbiton
+
+We welcome developers, system admins, and designers from all over the world to join us in making Orbiton the most beautiful and lightweight server control panel!
+
+---
+
+### How You Can Help
+1. **Report Bugs & Issue Tracker:**
+   * Found a crash or a broken button? Open an issue on GitHub. Please include steps to reproduce, node version, and system log.
+2. **Submit Pull Requests (PRs):**
+   * Fork the repository, create your feature branch (\`git checkout -b feat/amazing-feature\`), commit your changes, and open a PR.
+3. **Write Documentation:**
+   * Improve tutorials, correct typos, or add code snippet examples.
+4. **Translations:**
+   * Help translate the panel interface into more languages (Vietnamese, Spanish, Japanese, etc.).
+
+### Development Norms & Rules
+* Follow a clean, modular file structure.
+* Keep compiler integrations decoupled from process daemon managers.
+* Write robust error catch blocks for child processes.
+    `
+  },
+  {
+    id: 'feedback',
+    category: 'Community',
+    title: 'Submit Feedback & Reviews',
+    content: `
+# We Value Your Feedback
+
+Help us shape the future of Orbiton! Share your comments, suggest features, rate your experience, or let us know about any performance improvements you would like to see.
+
+---
+
+### Give us a GitHub Star!
+If you love using Orbiton, please consider giving us a ⭐ star on our official [GitHub Repository](https://github.com/iamprmgvyt/orbiton). It helps other developers discover the project and keeps the project actively maintained!
+    `
   }
 ];

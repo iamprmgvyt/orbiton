@@ -16,6 +16,129 @@ const GithubIcon = (props) => (
   </svg>
 );
 
+function FeedbackForm() {
+  const [rating, setRating] = useState(5);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [allFeedbacks, setAllFeedbacks] = useState([]);
+
+  useEffect(() => {
+    const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
+    setAllFeedbacks(list);
+  }, [submitted]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name || !message) return alert('Name and review content are required.');
+    const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
+    const newFeedback = { name, email, rating, message, date: new Date().toLocaleDateString() };
+    list.unshift(newFeedback);
+    localStorage.setItem('orbiton_feedbacks', JSON.stringify(list));
+    setSubmitted(true);
+    setName('');
+    setEmail('');
+    setMessage('');
+    setRating(5);
+    setTimeout(() => setSubmitted(false), 5000);
+  };
+
+  return (
+    <div className="feedback-section-container">
+      {submitted && (
+        <div className="feedback-success">
+          <h4>🎉 Góp ý của bạn đã được ghi nhận thành công!</h4>
+          <p>Cảm ơn sự đóng góp quý báu của bạn dành cho sự phát triển của Orbiton Panel.</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="feedback-form">
+        <h3 className="feedback-form-title">Đánh giá & Góp ý</h3>
+        <p className="feedback-form-subtitle">Chúng tôi luôn trân trọng mọi góp ý để hoàn thiện Orbiton từng ngày.</p>
+        
+        <div className="star-rating-wrapper">
+          <span className="rating-label">Mức độ hài lòng:</span>
+          <div className="star-rating">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <span
+                key={star}
+                onClick={() => setRating(star)}
+                className={`star-icon ${star <= rating ? 'active' : ''}`}
+              >
+                ★
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="feedback-input-grid">
+          <div>
+            <label className="feedback-input-label">Họ tên của bạn</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Nguyễn Văn A"
+              className="feedback-input-field"
+            />
+          </div>
+          <div>
+            <label className="feedback-input-label">Email (Không bắt buộc)</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="e.g. name@example.com"
+              className="feedback-input-field"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="feedback-input-label">Nội dung góp ý / Đánh giá</label>
+          <textarea
+            rows="4"
+            required
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            placeholder="Orbiton chạy rất mượt, giao diện rất đẹp, tôi muốn góp ý thêm tính năng..."
+            className="feedback-textarea-field"
+          ></textarea>
+        </div>
+
+        <button type="submit" className="feedback-submit-btn">
+          Gửi đánh giá & góp ý
+        </button>
+      </form>
+
+      {/* Community Feedbacks List */}
+      {allFeedbacks.length > 0 && (
+        <div className="community-reviews-list">
+          <h4 className="reviews-list-title">Đánh giá từ cộng đồng ({allFeedbacks.length})</h4>
+          <div className="reviews-cards-grid">
+            {allFeedbacks.map((f, idx) => (
+              <div key={idx} className="review-card">
+                <div className="review-card-header">
+                  <span className="review-author">{f.name}</span>
+                  <span className="review-date">{f.date}</span>
+                </div>
+                <div className="review-stars-static">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <span key={i} className={`star-static-icon ${i < f.rating ? 'active' : ''}`}>★</span>
+                  ))}
+                </div>
+                <p className="review-content">"{f.message}"</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [activeSectionId, setActiveSectionId] = useState('intro');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -287,6 +410,8 @@ export default function App() {
             // Paragraph
             return <p key={i}>{renderInlineText(el.text)}</p>;
           })}
+          
+          {activeSectionId === 'feedback' && <FeedbackForm />}
         </main>
 
         {/* Right Table of Contents (On this page) */}
