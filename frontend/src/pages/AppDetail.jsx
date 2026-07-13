@@ -121,9 +121,21 @@ export default function AppDetail({ appId, initialTab = 'logs', onBack, onRefres
   }, [activeTab, app?.id]);
 
   const handleAction = async (action) => {
+    if (action === 'kill') {
+      if (!confirm('Are you sure you want to FORCE KILL this process? This might cause data loss.')) return;
+    }
     try {
       await api(`/apps/${appId}/${action}`, 'POST');
       loadApp();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    try {
+      await api(`/apps/${appId}/logs/clear`, 'POST');
+      setLogs([]);
     } catch (err) {
       alert(err.message);
     }
@@ -267,6 +279,16 @@ export default function AppDetail({ appId, initialTab = 'logs', onBack, onRefres
         {/* Logs Tab */}
         {activeTab === 'logs' && (
           <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted">Process execution logs output (last 500 lines)</span>
+              <button
+                onClick={handleClearLogs}
+                className="text-xs text-red-500 hover:text-red-400 font-semibold bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-500/10 transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Clear Logs
+              </button>
+            </div>
             <div className="w-full bg-[#030307] border border-border/80 rounded-xl p-4 font-mono text-xs text-text2 h-[400px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
               {logs.length ? (
                 logs.map((log, index) => (

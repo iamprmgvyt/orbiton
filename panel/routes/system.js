@@ -37,4 +37,28 @@ router.get('/processes', async (req, res) => {
   }
 });
 
+// GET /api/system/firewall
+router.get('/firewall', async (req, res) => {
+  try {
+    const data = await daemonRequest('/api/system/firewall');
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/system/firewall/open
+router.post('/firewall/open', async (req, res) => {
+  try {
+    const data = await daemonRequest('/api/system/firewall/open', 'POST', req.body);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/system/firewall/close
+router.post('/firewall/close', async (req, res) => {
+  try {
+    const data = await daemonRequest('/api/system/firewall/close', 'POST', req.body);
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

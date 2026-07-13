@@ -143,8 +143,39 @@ function sendInput(appId, input) {
   entry.process.stdin.write(input + '\n');
 }
 
+async function runInstallCmd(appId, installCmd) {
+  if (!installCmd || !installCmd.trim()) return;
+  const dir = getAppDir(appId);
+  appendLog(appId, `\x1b[36m[Orbiton] Running install command: ${installCmd}\x1b[0m\n`);
+  
+  return new Promise((resolve) => {
+    const proc = spawn(installCmd, [], {
+      cwd: dir,
+      shell: true,
+      env: process.env,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    proc.stdout.on('data', (data) => appendLog(appId, data.toString()));
+    proc.stderr.on('data', (data) => appendLog(appId, `\x1b[31m${data.toString()}\x1b[0m`));
+    
+    proc.on('close', (code) => {
+      if (code === 0) {
+        appendLog(appId, `\x1b[32m[Orbiton] Install completed successfully!\x1b[0m\n`);
+      } else {
+        appendLog(appId, `\x1b[31m[Orbiton] Install failed with code ${code}\x1b[0m\n`);
+      }
+      resolve();
+    });
+    proc.on('error', (err) => {
+      appendLog(appId, `\x1b[31m[Orbiton Error] Install failed: ${err.message}\x1b[0m\n`);
+      resolve();
+    });
+  });
+}
+
 // ─── Import from Git ──────────────────────────────────────────
-async function importFromGit(appId, gitUrl, branch = '') {
+async function importFromGit(appId, gitUrl, branch = '', installCmd = '') {
   const dir = getAppDir(appId);
   return new Promise((resolve, reject) => {
     const branchFlag = branch ? `-b ${branch}` : '';
@@ -158,12 +189,13 @@ async function importFromGit(appId, gitUrl, branch = '') {
       }
       appendLog(appId, `\x1b[32m[Orbiton] Clone complete!\x1b[0m\n`);
       resolve({ success: true });
+      if (installCmd) runInstallCmd(appId, installCmd);
     });
   });
 }
 
 // ─── Import from ZIP ──────────────────────────────────────────
-async function importFromZip(appId, zipPath) {
+async function importFromZip(appId, zipPath, installCmd = '') {
   const unzipper = require('unzipper');
   const dir = getAppDir(appId);
   appendLog(appId, `\x1b[36m[Orbiton] Extracting ZIP...\x1b[0m\n`);
@@ -178,6 +210,7 @@ async function importFromZip(appId, zipPath) {
   try { fs.unlinkSync(zipPath); } catch (_) {}
 
   appendLog(appId, `\x1b[32m[Orbiton] ZIP extracted!\x1b[0m\n`);
+  if (installCmd) runInstallCmd(appId, installCmd);
   return { success: true };
 }
 
@@ -258,10 +291,21 @@ function updateStatus(appId, status) {
   emit('app:status', { appId, status });
 }
 
+function clearLogs(appId) {
+  const entry = processes.get(appId);
+  if (entry) {
+    entry.logs = [];
+  }
+  try {
+    const logFile = path.join(getAppDir(appId), 'console.log');
+    fs.writeFileSync(logFile, '');
+  } catch (_) {}
+}
+
 module.exports = {
   setIO,
   startApp, stopApp, restartApp, killApp, sendInput,
   importFromGit, importFromZip, pullDockerImage,
   getAppStatus, getRunningApps, getLogs, getAppDir,
-  stopAll,
+  stopAll, clearLogs,
 };

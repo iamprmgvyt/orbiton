@@ -12,6 +12,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
   const [name, setName] = useState('');
   const [runtime, setRuntime] = useState('nodejs');
   const [startCmd, setStartCmd] = useState('node index.js');
+  const [installCmd, setInstallCmd] = useState('');
   const [maxRam, setMaxRam] = useState(512);
   const [autoRestart, setAutoRestart] = useState(true);
   const [envVars, setEnvVars] = useState('{}');
@@ -60,6 +61,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
     setName('');
     setRuntime('nodejs');
     setStartCmd('node index.js');
+    setInstallCmd('');
     setMaxRam(512);
     setAutoRestart(true);
     setEnvVars('{}');
@@ -83,7 +85,16 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
       rust: 'cargo run',
       custom: 'echo "Hello Orbiton"'
     };
+    const installDefaults = {
+      nodejs: 'npm install',
+      python3: 'pip install -r requirements.txt',
+      java: '',
+      golang: '',
+      rust: '',
+      custom: ''
+    };
     setStartCmd(defaults[val] || 'node index.js');
+    setInstallCmd(installDefaults[val] || '');
   };
 
   const handleOpenEdit = (e, app) => {
@@ -92,6 +103,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
     setName(app.name);
     setRuntime(app.runtime);
     setStartCmd(app.start_cmd);
+    setInstallCmd(app.install_cmd || '');
     setMaxRam(app.max_ram);
     setAutoRestart(!!app.auto_restart);
     setEnvVars(JSON.stringify(app.env_vars || {}, null, 2));
@@ -124,6 +136,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
       name,
       runtime,
       start_cmd: startCmd,
+      install_cmd: installCmd,
       max_ram: parseInt(maxRam),
       auto_restart: autoRestart ? 1 : 0,
       env_vars: envObj,
@@ -386,30 +399,42 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
                 </div>
 
                 {importType === 'manual' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Runtime Environment</label>
-                      <select
-                        value={runtime}
-                        onChange={e => handleRuntimeChange(e.target.value)}
-                        className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
-                      >
-                        <option value="nodejs">Node.js</option>
-                        <option value="python3">Python 3</option>
-                        <option value="java">Java (OpenJDK)</option>
-                        <option value="golang">Golang</option>
-                        <option value="rust">Rust</option>
-                        <option value="custom">Custom Command</option>
-                      </select>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Runtime Environment</label>
+                        <select
+                          value={runtime}
+                          onChange={e => handleRuntimeChange(e.target.value)}
+                          className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                        >
+                          <option value="nodejs">Node.js</option>
+                          <option value="python3">Python 3</option>
+                          <option value="java">Java (OpenJDK)</option>
+                          <option value="golang">Golang</option>
+                          <option value="rust">Rust</option>
+                          <option value="custom">Custom Command</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup Command</label>
+                        <input
+                          type="text"
+                          required
+                          value={startCmd}
+                          onChange={e => setStartCmd(e.target.value)}
+                          placeholder="node index.js"
+                          className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                        />
+                      </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup Command</label>
+                      <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Install Command (Optional)</label>
                       <input
                         type="text"
-                        required
-                        value={startCmd}
-                        onChange={e => setStartCmd(e.target.value)}
-                        placeholder="node index.js"
+                        value={installCmd}
+                        onChange={e => setInstallCmd(e.target.value)}
+                        placeholder="npm install (Leave blank to skip)"
                         className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
                       />
                     </div>

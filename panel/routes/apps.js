@@ -44,6 +44,7 @@ const TEMPLATES = {
     name: 'Node.js Generic (Ptero-style)',
     runtime: 'nodejs',
     start_cmd: 'if [ -d .git ] && [ "$AUTO_UPDATE" = "1" ]; then git pull; fi; if [ -f package.json ]; then npm install; fi; node $MAIN_FILE $NODE_ARGS',
+    install_cmd: 'npm install',
     description: 'Generic Node.js app with auto dependency install and git sync support',
     icon: '🟩',
     env_hint: '{"MAIN_FILE": "index.js", "NODE_ARGS": "", "AUTO_UPDATE": "0"}',
@@ -53,6 +54,7 @@ const TEMPLATES = {
     name: 'Python Generic (Ptero-style)',
     runtime: 'python',
     start_cmd: 'if [ -d .git ] && [ "$AUTO_UPDATE" = "1" ]; then git pull; fi; if [ -f requirements.txt ]; then pip install -r requirements.txt; fi; python3 $PY_FILE',
+    install_cmd: 'pip install -r requirements.txt',
     description: 'Generic Python app with automatic requirements installer and git sync',
     icon: '🐍',
     env_hint: '{"PY_FILE": "app.py", "AUTO_UPDATE": "0"}',
@@ -62,6 +64,7 @@ const TEMPLATES = {
     name: 'Java Generic (Ptero-style)',
     runtime: 'java',
     start_cmd: 'java -Dterminal.jline=false -Dterminal.ansi=true -jar $JARFILE',
+    install_cmd: '',
     description: 'Generic Java container environment for execution jars',
     icon: '☕',
     env_hint: '{"JARFILE": "server.jar"}',
@@ -71,6 +74,7 @@ const TEMPLATES = {
     name: 'Discord.js Bot',
     runtime: 'nodejs',
     start_cmd: 'node index.js',
+    install_cmd: 'npm install discord.js dotenv',
     description: 'Discord bot with Node.js',
     icon: '🤖',
     env_hint: '{"DISCORD_TOKEN": "your-token"}',
@@ -80,6 +84,7 @@ const TEMPLATES = {
     name: 'Discord.py Bot',
     runtime: 'python',
     start_cmd: 'python3 bot.py',
+    install_cmd: 'pip3 install discord.py python-dotenv',
     description: 'Discord bot with Python',
     icon: '🤖',
     env_hint: '{"DISCORD_TOKEN": "your-token"}',
@@ -89,6 +94,7 @@ const TEMPLATES = {
     name: 'Express.js API',
     runtime: 'nodejs',
     start_cmd: 'node server.js',
+    install_cmd: 'npm install express',
     description: 'Express.js REST API server',
     icon: '🌐',
     env_hint: '{"PORT": "3000"}',
@@ -98,6 +104,7 @@ const TEMPLATES = {
     name: 'FastAPI',
     runtime: 'python',
     start_cmd: 'python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload',
+    install_cmd: 'pip3 install fastapi uvicorn',
     description: 'FastAPI Python web framework',
     icon: '⚡',
     env_hint: '{}',
@@ -107,6 +114,7 @@ const TEMPLATES = {
     name: 'Minecraft Server',
     runtime: 'java',
     start_cmd: 'java -Xmx2G -Xms512M -jar server.jar nogui',
+    install_cmd: '',
     description: 'Minecraft Java Edition server',
     icon: '⛏️',
     max_ram: 2048,
@@ -163,7 +171,7 @@ router.get('/runtimes', async (req, res) => {
 
 // ─── Create App ───────────────────────────────────────────────
 router.post('/', (req, res) => {
-  const { name, description, runtime, start_cmd, env_vars, max_ram, auto_restart, template } = req.body;
+  const { name, description, runtime, start_cmd, install_cmd, env_vars, max_ram, auto_restart, template } = req.body;
 
   let tpl = {};
   if (template && TEMPLATES[template]) {
@@ -172,6 +180,7 @@ router.post('/', (req, res) => {
 
   const finalName    = name?.trim() || tpl.name;
   const finalCmd     = start_cmd?.trim() || tpl.start_cmd;
+  const finalInstall = install_cmd !== undefined ? install_cmd.trim() : (tpl.install_cmd || '');
   const finalRuntime = runtime || tpl.runtime || 'custom';
 
   if (!finalName || !finalCmd)
@@ -181,15 +190,16 @@ router.post('/', (req, res) => {
   const workDir = `/opt/orbiton-data/apps/${id}`;
 
   db.prepare(`
-    INSERT INTO apps (id, name, description, runtime, start_cmd, work_dir,
+    INSERT INTO apps (id, name, description, runtime, start_cmd, install_cmd, work_dir,
                       owner_id, env_vars, max_ram, auto_restart)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     finalName,
     description || tpl.description || '',
     finalRuntime,
     finalCmd,
+    finalInstall,
     workDir,
     req.user.id,
     JSON.stringify(env_vars || {}),
@@ -214,7 +224,7 @@ router.patch('/:id', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
 
-  const { name, description, runtime, start_cmd, env_vars, max_ram, auto_restart } = req.body;
+  const { name, description, runtime, start_cmd, install_cmd, env_vars, max_ram, auto_restart } = req.body;
   const statusInfo = await daemonRequest(`/api/apps/${app.id}/status`).catch(() => ({ status: 'stopped' }));
   if (statusInfo.status === 'running')
     return res.status(409).json({ error: 'Stop the application first before editing' });
@@ -225,6 +235,7 @@ router.patch('/:id', async (req, res) => {
       description  = COALESCE(?, description),
       runtime      = COALESCE(?, runtime),
       start_cmd    = COALESCE(?, start_cmd),
+      install_cmd  = COALESCE(?, install_cmd),
       env_vars     = COALESCE(?, env_vars),
       max_ram      = COALESCE(?, max_ram),
       auto_restart = COALESCE(?, auto_restart)
@@ -234,6 +245,7 @@ router.patch('/:id', async (req, res) => {
     description !== undefined ? description : null,
     runtime || null,
     start_cmd || null,
+    install_cmd !== undefined ? install_cmd : null,
     env_vars ? JSON.stringify(env_vars) : null,
     max_ram || null,
     auto_restart !== undefined ? (auto_restart ? 1 : 0) : null,
@@ -316,6 +328,15 @@ router.get('/:id/logs', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
+router.post('/:id/logs/clear', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    await daemonRequest(`/api/apps/${app.id}/logs/clear`, 'POST');
+    res.json({ success: true });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // ─── Import: Git Clone ────────────────────────────────────────
 router.post('/:id/import/git', async (req, res) => {
   const app = getAuthorizedApp(req, res);
@@ -324,7 +345,7 @@ router.post('/:id/import/git', async (req, res) => {
   if (!url) return res.status(400).json({ error: 'url required' });
 
   try {
-    await daemonRequest(`/api/apps/${app.id}/import/git`, 'POST', { url, branch });
+    await daemonRequest(`/api/apps/${app.id}/import/git`, 'POST', { url, branch, installCmd: app.install_cmd });
     db.prepare("UPDATE apps SET import_source = ? WHERE id = ?").run(`git:${url}`, app.id);
     res.json({ success: true, message: 'Git clone started' });
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -341,6 +362,7 @@ router.post('/:id/import/zip', zipUpload.single('file'), async (req, res) => {
     const fileBuffer = fs.readFileSync(req.file.path);
     const fileBlob = new globalThis.Blob([fileBuffer]);
     fd.append('file', fileBlob, req.file.originalname);
+    fd.append('installCmd', app.install_cmd || '');
     
     // Clean temp local file asynchronously
     fs.unlink(req.file.path, () => {});

@@ -111,8 +111,8 @@ app.get('/api/apps/status', (req, res) => {
 
 app.post('/api/apps/:appId/import/git', async (req, res) => {
   try {
-    const { url, branch } = req.body;
-    processManager.importFromGit(req.params.appId, url, branch);
+    const { url, branch, installCmd } = req.body;
+    processManager.importFromGit(req.params.appId, url, branch, installCmd);
     res.json({ success: true, message: 'Git clone started' });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -120,7 +120,8 @@ app.post('/api/apps/:appId/import/git', async (req, res) => {
 app.post('/api/apps/:appId/import/zip', zipUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'ZIP file required' });
-    processManager.importFromZip(req.params.appId, req.file.path);
+    const { installCmd } = req.body;
+    processManager.importFromZip(req.params.appId, req.file.path, installCmd);
     res.json({ success: true, message: 'Extracting ZIP...' });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -190,6 +191,71 @@ function execSyncCheck(cmd) {
     return require('child_process').execSync(cmd, { stdio: 'pipe' }).toString().trim();
   } catch (_) { return null; }
 }
+
+// GET /api/system/firewall - List open ports
+app.get('/api/system/firewall', (req, res) => {
+  const { exec } = require('child_process');
+  exec('ufw status verbose', (err, stdout, stderr) => {
+    if (err || stdout.includes('inactive')) {
+      return res.json({ active: false, rules: [] });
+    }
+    
+    const lines = stdout.split('\n');
+    const rules = [];
+    lines.forEach(line => {
+      // Example line: "25565/tcp                   ALLOW IN    Anywhere"
+      const match = line.trim().match(/^(\d+)\/(\w+)\s+(ALLOW|DENY)\s+IN/i);
+      if (match) {
+        rules.push({
+          port: parseInt(match[1]),
+          protocol: match[2].toLowerCase(),
+          action: match[3].toLowerCase()
+        });
+      }
+    });
+    res.json({ active: true, rules });
+  });
+});
+
+// POST /api/system/firewall/open
+app.post('/api/system/firewall/open', (req, res) => {
+  const { port, protocol } = req.body;
+  if (!port) return res.status(400).json({ error: 'Port required' });
+  const { exec } = require('child_process');
+  
+  const proto = protocol || 'tcp';
+  const cmd = `ufw allow ${port}/${proto}`;
+  
+  exec(cmd, (err, stdout, stderr) => {
+    if (err) return res.status(500).json({ error: err.message });
+    exec('ufw reload', () => {});
+    res.json({ success: true, message: stdout.trim() });
+  });
+});
+
+// POST /api/system/firewall/close
+app.post('/api/system/firewall/close', (req, res) => {
+  const { port, protocol } = req.body;
+  if (!port) return res.status(400).json({ error: 'Port required' });
+  const { exec } = require('child_process');
+  
+  const proto = protocol || 'tcp';
+  const cmd = `ufw delete allow ${port}/${proto}`;
+  
+  exec(cmd, (err, stdout, stderr) => {
+    if (err) return res.status(500).json({ error: err.message });
+    exec('ufw reload', () => {});
+    res.json({ success: true, message: stdout.trim() });
+  });
+});
+
+// POST /api/apps/:appId/logs/clear
+app.post('/api/apps/:appId/logs/clear', (req, res) => {
+  try {
+    processManager.clearLogs(req.params.appId);
+    res.json({ success: true });
+  } catch (err) { res.status(400).json({ error: err.message }); }
+});
 
 // ─── Socket.IO WebSockets ─────────────────────────────────────
 const io = new Server(server, { cors: { origin: '*' } });

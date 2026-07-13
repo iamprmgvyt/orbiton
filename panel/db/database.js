@@ -54,6 +54,7 @@ function initDatabase() {
       description   TEXT    DEFAULT '',
       runtime       TEXT    NOT NULL DEFAULT 'custom',
       start_cmd     TEXT    NOT NULL,
+      install_cmd   TEXT    DEFAULT '',
       work_dir      TEXT    NOT NULL,
       status        TEXT    NOT NULL DEFAULT 'stopped',
       owner_id      INTEGER NOT NULL,
@@ -88,6 +89,11 @@ function initDatabase() {
       timestamp TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // Migration: install_cmd
+  try {
+    db.exec("ALTER TABLE apps ADD COLUMN install_cmd TEXT DEFAULT '';");
+  } catch (_) {}
 
   console.log(`✅ Database: ${DB_PATH}`);
 }
