@@ -277,14 +277,20 @@ io.on('connection', (socket) => {
     if (ptyProcess) return;
 
     const shell = os.platform() === 'win32' ? 'powershell.exe' : 'bash';
+    const args = os.platform() === 'win32' ? ['-NoProfile'] : ['--norc'];
     const workDir = appId ? processManager.getAppDir(appId) : (process.env.DATA_DIR || '/opt/orbiton-data');
 
-    ptyProcess = pty.spawn(shell, [], {
+    const customEnv = {
+      ...process.env,
+      PS1: "\x1b[1;35m<<[Orbiton]>>\x1b[0m # "
+    };
+
+    ptyProcess = pty.spawn(shell, args, {
       name: 'xterm-color',
       cols: cols || 80,
       rows: rows || 24,
       cwd:  workDir,
-      env:  process.env
+      env:  customEnv
     });
 
     ptyProcess.onData((data) => {
