@@ -297,8 +297,8 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
             <div className="w-full bg-[#030307] border border-border/80 rounded-xl overflow-hidden p-4">
               <div ref={terminalRef} className="h-[400px]"></div>
             </div>
-            <div className="text-[10px] text-muted">
-              💡 Tip: Bạn có thể gõ các câu lệnh trực tiếp vào khung console phía trên để tương tác với tiến trình đang chạy.
+             <div className="text-[10px] text-muted">
+              💡 Tip: You can type interactive commands directly into the terminal console above to send stdin to the running process.
             </div>
           </div>
         )}
