@@ -9,7 +9,7 @@ export default function Topbar({ activePage, onRefresh, onOpenSidebar }) {
     terminal: ['AIO Terminal', 'Direct terminal console to the host VPS'],
     files: ['File Manager', 'Browse, upload, and edit local files'],
     monitor: ['System Monitor', 'Detailed graphical performance metrics'],
-    runtimes: ['Runtime Detector', 'Installed compilers, runners and package managers'],
+    runtimes: ['Runtime', 'Installed compilers, runners and package managers'],
     users: ['Users Management', 'Configure access control and administrator roles'],
     settings: ['Settings', 'Customize security and profile settings'],
   };

@@ -290,6 +290,7 @@ app.get('/api/system/runtimes', (req, res) => {
   for (const [key, state] of runtimeInstalls.entries()) {
     if (result[key]) {
       result[key].isInstalling = (state.status === 'installing');
+      result[key].isUninstalling = (state.status === 'uninstalling');
       result[key].installStatus = state.status;
       result[key].installError = state.error;
     }
@@ -370,6 +371,69 @@ app.get('/api/system/runtimes/install/log', (req, res) => {
   }
   const content = fs.readFileSync(logFile, 'utf8');
   res.json({ log: content });
+});
+
+app.post('/api/system/runtimes/uninstall', (req, res) => {
+  const { runtime } = req.body;
+  if (!runtime) return res.status(400).json({ error: 'Runtime identifier required' });
+
+  const PROTECTED_RUNTIMES = ['nodejs', 'npm', 'git', 'bash', 'curl', 'wget'];
+  if (PROTECTED_RUNTIMES.includes(runtime)) {
+    return res.status(400).json({ error: `Runtime ${runtime} is protected and cannot be uninstalled.` });
+  }
+
+  if (runtimeInstalls.get(runtime)?.status === 'uninstalling') {
+    return res.json({ success: true, message: 'Uninstallation already in progress' });
+  }
+
+  const uninstallCmds = {
+    python3: 'sudo apt-get remove --purge -y python3 python3-pip python3-venv && sudo apt-get autoremove -y',
+    pip3:    'sudo apt-get remove --purge -y python3-pip && sudo apt-get autoremove -y',
+    java:    'sudo apt-get remove --purge -y openjdk-17-jdk openjdk-17-jre && sudo apt-get autoremove -y',
+    docker:  'sudo apt-get remove --purge -y docker-ce docker-ce-cli containerd.io && sudo apt-get autoremove -y',
+    gradle:  'sudo apt-get remove --purge -y gradle && sudo apt-get autoremove -y',
+    mvn:     'sudo apt-get remove --purge -y maven && sudo apt-get autoremove -y',
+    go:      'sudo apt-get remove --purge -y golang-go && sudo apt-get autoremove -y',
+    rust:    'rustup self uninstall -y',
+    deno:    'rm -rf /root/.deno /usr/local/bin/deno',
+    bun:     'rm -rf /root/.bun /usr/local/bin/bun',
+    php:     'sudo apt-get remove --purge -y php-cli php-curl php-json php-common && sudo apt-get autoremove -y',
+    ruby:    'sudo apt-get remove --purge -y ruby-full && sudo apt-get autoremove -y',
+    perl:    'sudo apt-get remove --purge -y perl && sudo apt-get autoremove -y',
+    lua:     'sudo apt-get remove --purge -y lua5.3 && sudo apt-get autoremove -y'
+  };
+
+  const cmd = uninstallCmds[runtime];
+  if (!cmd) return res.status(400).json({ error: `Uninstallation command for ${runtime} is not defined` });
+
+  runtimeInstalls.set(runtime, { status: 'uninstalling', error: null });
+
+  const dataDir = process.env.DATA_DIR || '/opt/orbiton-data';
+  const logFile = path.join(dataDir, `runtime-install-${runtime}.log`);
+  fs.writeFileSync(logFile, `🪐 Starting uninstallation of ${runtime} at ${new Date().toISOString()}\nLệnh thực thi: ${cmd}\n\n`);
+
+  const { spawn } = require('child_process');
+  const child = spawn(cmd, [], { shell: true, env: process.env });
+
+  child.stdout.on('data', (data) => {
+    fs.appendFileSync(logFile, data.toString());
+  });
+
+  child.stderr.on('data', (data) => {
+    fs.appendFileSync(logFile, data.toString());
+  });
+
+  child.on('close', (code) => {
+    if (code === 0) {
+      runtimeInstalls.set(runtime, { status: 'success', error: null });
+      fs.appendFileSync(logFile, `\n🪐 Uninstallation completed successfully!\n`);
+    } else {
+      runtimeInstalls.set(runtime, { status: 'failed', error: `Exit code ${code}` });
+      fs.appendFileSync(logFile, `\n🪐 Uninstallation failed with exit code ${code}.\n`);
+    }
+  });
+
+  res.json({ success: true, message: 'Uninstallation started' });
 });
 
 // GET /api/system/firewall - List open ports
