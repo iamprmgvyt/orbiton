@@ -32,8 +32,8 @@ function getAppDir(appId) {
 // ─── Start App ────────────────────────────────────────────────
 function startApp(appId, appConfig) {
   const existing = processes.get(appId);
-  if (existing?.status === 'running') {
-    throw new Error('Application is already running');
+  if (existing?.status === 'running' || existing?.status === 'starting') {
+    throw new Error('Application is already active');
   }
 
   const workDir = getAppDir(appId);
@@ -53,10 +53,71 @@ function startApp(appId, appConfig) {
     APP_NAME: appConfig.name,
   };
 
-  const cmdStr = appConfig.start_cmd.trim();
-  updateStatus(appId, 'starting');
+  const installCmd = appConfig.install_cmd ? appConfig.install_cmd.trim() : '';
+  const startCmd = appConfig.start_cmd.trim();
 
-  const proc = spawn(cmdStr, [], {
+  // If there is an install command, run it first!
+  if (installCmd) {
+    updateStatus(appId, 'starting');
+    appendLog(appId, `\x1b[36m[Orbiton] Step 1/2: Running installation command: ${installCmd}\x1b[0m\n`);
+
+    const installProc = spawn(installCmd, [], {
+      cwd: workDir,
+      env,
+      shell: true,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    });
+
+    const entry = {
+      pid: installProc.pid,
+      status: 'starting',
+      logs: [],
+      process: installProc,
+      startedAt: new Date().toISOString(),
+      config: appConfig
+    };
+    processes.set(appId, entry);
+
+    installProc.stdout.on('data', (data) => appendLog(appId, data.toString()));
+    installProc.stderr.on('data', (data) => appendLog(appId, `\x1b[31m${data.toString()}\x1b[0m`));
+
+    installProc.on('close', (code) => {
+      const current = processes.get(appId);
+      // Check if it was stopped/killed during installation
+      if (!current || current.status === 'stopped' || current.status === 'stopping') return;
+
+      if (code === 0) {
+        appendLog(appId, `\x1b[32m[Orbiton] Step 2/2: Installation complete! Launching startup command: ${startCmd}\x1b[0m\n`);
+        launchStartupCmd(appId, appConfig, workDir, env);
+      } else {
+        appendLog(appId, `\x1b[31m[Orbiton Error] Installation failed with code ${code}. Startup aborted.\x1b[0m\n`);
+        current.status = 'stopped';
+        updateStatus(appId, 'stopped');
+      }
+    });
+
+    installProc.on('error', (err) => {
+      const current = processes.get(appId);
+      if (!current || current.status === 'stopped' || current.status === 'stopping') return;
+
+      appendLog(appId, `\x1b[31m[Orbiton Error] Installation process error: ${err.message}\x1b[0m\n`);
+      current.status = 'stopped';
+      updateStatus(appId, 'stopped');
+    });
+
+    return { pid: installProc.pid };
+
+  } else {
+    // No install command, launch startup command directly
+    updateStatus(appId, 'starting');
+    return launchStartupCmd(appId, appConfig, workDir, env);
+  }
+}
+
+function launchStartupCmd(appId, appConfig, workDir, env) {
+  const startCmd = appConfig.start_cmd.trim();
+  const proc = spawn(startCmd, [], {
     cwd:   workDir,
     env,
     shell: true,
@@ -108,7 +169,9 @@ function startApp(appId, appConfig) {
 // ─── Stop App ─────────────────────────────────────────────────
 function stopApp(appId, signal = null) {
   const entry = processes.get(appId);
-  if (!entry || entry.status !== 'running') throw new Error('Application is not running');
+  if (!entry || (entry.status !== 'running' && entry.status !== 'starting')) {
+    throw new Error('Application is not active');
+  }
 
   if (IS_WIN) {
     if (signal === 'SIGKILL') {
