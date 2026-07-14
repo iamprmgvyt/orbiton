@@ -335,6 +335,12 @@ export default function App() {
   return (
     <div className="docs-app">
       
+      {/* Aurora Neon Background Glows */}
+      <div className="aurora-bg">
+        <div className="aurora-glow-1"></div>
+        <div className="aurora-glow-2"></div>
+      </div>
+      
       {/* Header / Top Navigation Bar */}
       <header className="docs-header">
         <div className="header-brand">
@@ -431,6 +437,38 @@ export default function App() {
         <main className="docs-content">
           {parsedElements.map((el, i) => {
             if (el.type === 'h1') {
+              if (activeSectionId === 'intro') {
+                return (
+                  <div key={i} className="hero-banner">
+                    <h1 className="hero-title">{el.text}</h1>
+                    <p className="hero-subtitle">
+                      Universal self-hosted application & server manager built for maximum responsiveness, visual aesthetics, ultra-low resource footprint, and zero setup lag.
+                    </p>
+                    <div className="hero-ctas">
+                      <button onClick={() => selectSection('get-started')} className="btn-hero-primary">
+                        Get Started
+                      </button>
+                      <a href="https://github.com/iamprmgvyt/orbiton" target="_blank" rel="noreferrer" className="btn-hero-secondary">
+                        View GitHub
+                      </a>
+                    </div>
+                    <div className="hero-stats">
+                      <div className="stat-item">
+                        <span className="stat-val">&lt; 50MB</span>
+                        <span className="stat-lbl">RAM footprint</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-val">1-Click</span>
+                        <span className="stat-lbl">Compiler setup</span>
+                      </div>
+                      <div className="stat-item">
+                        <span className="stat-val">Real-time</span>
+                        <span className="stat-lbl">WebSocket PTY</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return <h1 key={i}>{el.text}</h1>;
             }
             if (el.type === 'h2') {
@@ -456,6 +494,11 @@ export default function App() {
               return (
                 <div key={i} className="code-block-wrapper">
                   <div className="code-block-header">
+                    <div className="mac-dots-wrapper">
+                      <span className="mac-dot mac-dot-red"></span>
+                      <span className="mac-dot mac-dot-yellow"></span>
+                      <span className="mac-dot mac-dot-green"></span>
+                    </div>
                     <span>{el.lang}</span>
                     <button
                       onClick={() => handleCopy(el.content, blockId)}

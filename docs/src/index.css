@@ -3,8 +3,8 @@
    ============================================================ */
 
 :root {
-  --bg-color: #050608;
-  --bg-card: #0b0c11;
+  --bg-color: #040507;
+  --bg-card: rgba(11, 12, 18, 0.6);
   --bg-code: #030406;
   --text-main: #9ca3af;
   --text-light: #e5e7eb;
@@ -13,7 +13,7 @@
   --accent: #8b5cf6;
   --accent-light: #c084fc;
   --accent-glow: rgba(139, 92, 246, 0.15);
-  --accent-border: rgba(139, 92, 246, 0.3);
+  --accent-border: rgba(139, 92, 246, 0.25);
   --border-color: rgba(255, 255, 255, 0.05);
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Outfit', sans-serif;
@@ -53,6 +53,52 @@ body {
   box-shadow: 0 0 10px var(--accent);
 }
 
+/* Aurora background glow balls */
+.aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora-glow-1 {
+  position: absolute;
+  top: -20%;
+  left: -10%;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  filter: blur(80px);
+  animation: floatSlow1 25s infinite alternate ease-in-out;
+}
+
+.aurora-glow-2 {
+  position: absolute;
+  bottom: -10%;
+  right: -10%;
+  width: 700px;
+  height: 700px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.06) 0%, transparent 70%);
+  filter: blur(100px);
+  animation: floatSlow2 30s infinite alternate ease-in-out;
+}
+
+@keyframes floatSlow1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(100px, 80px) scale(1.2); }
+}
+
+@keyframes floatSlow2 {
+  0% { transform: translate(0, 0) scale(1.2); }
+  100% { transform: translate(-120px, -60px) scale(0.9); }
+}
+
 /* Base Layout Classes */
 .docs-app {
   min-height: 100vh;
@@ -66,9 +112,9 @@ body {
   top: 0;
   z-index: 100;
   height: 64px;
-  background-color: rgba(5, 6, 8, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: rgba(5, 6, 8, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid rgba(139, 92, 246, 0.15);
   display: flex;
   align-items: center;
@@ -108,7 +154,7 @@ body {
 }
 
 .brand-badge {
-  background-color: rgba(139, 92, 246, 0.1);
+  background-color: rgba(139, 92, 246, 0.08);
   border: 1px solid rgba(139, 92, 246, 0.2);
   color: #a78bfa;
   font-family: var(--font-mono);
@@ -134,7 +180,7 @@ body {
   font-weight: 600;
   transition: all 0.3s ease;
   padding: 8px 16px;
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--border-color);
   border-radius: 10px;
 }
@@ -184,7 +230,7 @@ body {
 
 .search-input {
   width: 100%;
-  background-color: var(--bg-card);
+  background-color: rgba(11, 12, 18, 0.5);
   border: 1px solid var(--border-color);
   border-radius: 14px;
   padding: 12px 16px 12px 42px;
@@ -253,7 +299,118 @@ body {
   padding: 32px 0 64px;
 }
 
-/* Premium Gradient Title H1 */
+/* Premium Welcome Hero Banner (Docs Start Page) */
+.hero-banner {
+  background: linear-gradient(135deg, rgba(23, 25, 35, 0.4) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 24px;
+  padding: 40px;
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
+}
+
+.hero-title {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 2.75rem;
+  line-height: 1.15;
+  margin-bottom: 12px;
+  background: linear-gradient(to right, #ffffff, #c084fc, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-subtitle {
+  font-size: 15px;
+  color: #cfd3dc;
+  margin-bottom: 24px;
+  max-width: 580px;
+  line-height: 1.7;
+}
+
+.hero-ctas {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.btn-hero-primary {
+  background: linear-gradient(135deg, var(--accent), #3b82f6);
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 12px 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+  transition: all 0.25s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-hero-primary:hover {
+  box-shadow: 0 4px 25px rgba(139, 92, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-hero-secondary {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-hero-secondary:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.hero-stats {
+  display: flex;
+  gap: 24px;
+  border-t: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 24px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-val {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-light);
+  text-shadow: 0 0 10px rgba(192, 132, 252, 0.3);
+}
+
+.stat-lbl {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+}
+
+/* Premium Gradient Title H1 (Normal pages) */
 .docs-content h1 {
   font-family: var(--font-heading);
   font-weight: 800;
@@ -281,10 +438,10 @@ body {
 .docs-content h3 {
   font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   color: var(--text-heading);
-  margin-top: 32px;
-  margin-bottom: 14px;
+  margin-top: 28px;
+  margin-bottom: 12px;
 }
 
 .docs-content p {
@@ -339,7 +496,7 @@ body {
   border: 1px solid rgba(192, 132, 252, 0.15);
 }
 
-/* Beautiful Code Block Box with Glow on Hover */
+/* Beautiful Code Block Box with Mac Dots and Glow on Hover */
 .code-block-wrapper {
   margin: 28px 0;
   border: 1px solid var(--border-color);
@@ -356,7 +513,7 @@ body {
 
 .code-block-header {
   background-color: #07080b;
-  padding: 10px 20px;
+  padding: 12px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -367,6 +524,23 @@ body {
   border-bottom: 1px solid var(--border-color);
   text-transform: uppercase;
 }
+
+/* Mac window dot buttons mock */
+.mac-dots-wrapper {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.mac-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.mac-dot-red { background-color: #ef4444; }
+.mac-dot-yellow { background-color: #f59e0b; }
+.mac-dot-green { background-color: #10b981; }
 
 .btn-copy {
   display: inline-flex;
@@ -455,7 +629,7 @@ body {
 
 .toc-link:hover {
   color: var(--text-heading);
-  transform: translateX(3px);
+  transform: translateX(4px);
 }
 
 .toc-item.h3 {
@@ -480,42 +654,43 @@ body {
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  padding: 20px;
+  padding: 24px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  backdrop-filter: blur(8px);
 }
 
 .feature-card:hover {
   border-color: rgba(139, 92, 246, 0.25);
   transform: translateY(-3px);
-  box-shadow: 0 10px 25px rgba(139, 92, 246, 0.1);
+  box-shadow: 0 10px 25px rgba(139, 92, 246, 0.15);
 }
 
 .feature-icon-wrapper {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   background-color: rgba(139, 92, 246, 0.08);
   border: 1px solid rgba(139, 92, 246, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--accent-light);
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.1));
 }
 
 .feature-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-heading);
   margin-bottom: 8px;
 }
 
 .feature-desc {
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--text-main);
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 /* Responsive Mobile Rules */
@@ -554,6 +729,14 @@ body {
   }
 
   .docs-content h1 {
+    font-size: 2rem;
+  }
+
+  .hero-banner {
+    padding: 28px 20px;
+  }
+
+  .hero-title {
     font-size: 2rem;
   }
 }
@@ -621,6 +804,7 @@ body {
   flex-direction: column;
   gap: 22px;
   box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(8px);
   transition: all 0.3s ease;
 }
 
@@ -767,6 +951,7 @@ body {
   border-radius: 16px;
   padding: 20px;
   transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
 }
 
 .review-card:hover {
