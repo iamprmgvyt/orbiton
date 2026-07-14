@@ -7,9 +7,10 @@
 *A lightweight, visual-first alternative to Pterodactyl. Deploy, monitor, and scale apps, bots, and game servers in real time.*
 
 [![GitHub License](https://img.shields.io/github/license/iamprmgvyt/orbiton?color=8b5cf6&style=for-the-badge)](LICENSE)
-[![Node version](https://img.shields.io/node/v/orbiton?color=3b82f6&style=for-the-badge)](https://nodejs.org)
+[![Node version](https://img.shields.io/badge/Node.js-20+-3b82f6?style=for-the-badge&logo=node.js)](https://nodejs.org)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-34d399?style=for-the-badge)]()
-[![Installs Counter](https://img.shields.io/badge/dynamic/json?color=ec4899&label=Installs&query=count&url=https%3A%2F%2Fapi.counterapi.dev%2Fv1%2Forbiton%2Finstall&style=for-the-badge)](https://github.com/iamprmgvyt/orbiton)
+[![GitHub Stars](https://img.shields.io/github/stars/iamprmgvyt/orbiton?color=yellow&style=for-the-badge)](https://github.com/iamprmgvyt/orbiton/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/iamprmgvyt/orbiton?color=ec4899&style=for-the-badge)](https://github.com/iamprmgvyt/orbiton/network/members)
 
 ---
 
