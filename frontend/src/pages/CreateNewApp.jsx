@@ -21,8 +21,8 @@ export default function CreateNewApp({ onBack, onRefresh }) {
   // Form states
   const [name, setName] = useState('');
   const [runtime, setRuntime] = useState('nodejs');
-  const [startCmd, setStartCmd] = useState('node index.js');
-  const [installCmd, setInstallCmd] = useState('npm install');
+  const [startCmd, setStartCmd] = useState('index.js');
+  const [installCmd, setInstallCmd] = useState('package.json');
   const [maxRam, setMaxRam] = useState(512);
   const [autoRestart, setAutoRestart] = useState(true);
   const [envVars, setEnvVars] = useState('{}');
@@ -61,24 +61,24 @@ export default function CreateNewApp({ onBack, onRefresh }) {
   const handleRuntimeChange = (val) => {
     setRuntime(val);
     const defaults = {
-      nodejs: 'node index.js',
-      python3: 'python3 app.py',
-      java: 'java -jar server.jar',
-      golang: 'go run main.go',
-      rust: 'cargo run',
-      'docker-compose': 'docker compose up',
-      custom: 'echo "Hello Orbiton"'
+      nodejs: 'index.js',
+      python3: 'main.py',
+      java: 'server.jar',
+      golang: 'main.go',
+      rust: 'Cargo.toml',
+      'docker-compose': 'docker-compose.yml',
+      custom: 'start.sh'
     };
     const installDefaults = {
-      nodejs: 'npm install',
-      python3: 'pip install -r requirements.txt',
+      nodejs: 'package.json',
+      python3: 'requirements.txt',
       java: '',
       golang: '',
       rust: '',
       'docker-compose': '',
       custom: ''
     };
-    setStartCmd(defaults[val] || 'node index.js');
+    setStartCmd(defaults[val] || 'index.js');
     setInstallCmd(installDefaults[val] || '');
   };
 
@@ -290,24 +290,24 @@ export default function CreateNewApp({ onBack, onRefresh }) {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup Command</label>
+                      <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup File</label>
                       <input
                         type="text"
                         required
                         value={startCmd}
                         onChange={e => setStartCmd(e.target.value)}
-                        placeholder="node index.js"
+                        placeholder="e.g. main.py, index.js, server.jar"
                         className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Install Command (Optional)</label>
+                    <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Install File (Optional)</label>
                     <input
                       type="text"
                       value={installCmd}
                       onChange={e => setInstallCmd(e.target.value)}
-                      placeholder="npm install (Leave blank to skip)"
+                      placeholder="e.g. requirements.txt, package.json (Leave blank to skip)"
                       className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
                     />
                   </div>

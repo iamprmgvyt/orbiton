@@ -36,6 +36,34 @@ function getAppDir(appId) {
   return dir;
 }
 
+function buildStartCommand(runtime, fileOrCmd) {
+  const val = fileOrCmd ? fileOrCmd.trim() : '';
+  if (!val) return '';
+  if (val.includes(' ')) return val; // Already a full command
+  
+  if (runtime === 'nodejs') return `node ${val}`;
+  if (runtime === 'python' || runtime === 'python3') return `python3 ${val}`;
+  if (runtime === 'java') return `java -jar ${val}`;
+  if (runtime === 'go' || runtime === 'golang') return `go run ${val}`;
+  return val;
+}
+
+function buildInstallCommand(runtime, fileOrCmd) {
+  const val = fileOrCmd ? fileOrCmd.trim() : '';
+  if (!val) return '';
+  if (val.includes(' ')) return val; // Already a full command
+  
+  if (runtime === 'nodejs') {
+    if (val === 'yarn.lock') return 'yarn install';
+    if (val === 'pnpm-lock.yaml') return 'pnpm install';
+    return 'npm install';
+  }
+  if (runtime === 'python' || runtime === 'python3') {
+    return `pip install -r ${val} --break-system-packages`;
+  }
+  return '';
+}
+
 // ─── Start App ────────────────────────────────────────────────
 function startApp(appId, appConfig) {
   const existing = processes.get(appId);
@@ -60,11 +88,8 @@ function startApp(appId, appConfig) {
     APP_NAME: appConfig.name,
   };
 
-  let installCmd = appConfig.install_cmd ? appConfig.install_cmd.trim() : '';
-  if (installCmd && installCmd.includes('pip ') && !installCmd.includes('--break-system-packages')) {
-    installCmd += ' --break-system-packages';
-  }
-  const startCmd = appConfig.start_cmd.trim();
+  const installCmd = buildInstallCommand(appConfig.runtime, appConfig.install_cmd);
+  const startCmd = buildStartCommand(appConfig.runtime, appConfig.start_cmd);
 
   // If there is an install command, run it first!
   if (installCmd) {
@@ -121,7 +146,7 @@ function startApp(appId, appConfig) {
 }
 
 function launchStartupCmd(appId, appConfig, workDir, env) {
-  const startCmd = appConfig.start_cmd.trim();
+  const startCmd = buildStartCommand(appConfig.runtime, appConfig.start_cmd);
   
   const proc = pty.spawn(IS_WIN ? 'powershell.exe' : 'bash', IS_WIN ? ['-NoProfile', '-Command', startCmd] : ['-c', startCmd], {
     name: 'xterm-color',

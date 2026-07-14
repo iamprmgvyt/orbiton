@@ -1000,10 +1000,11 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup Command</label>
+                  <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup File</label>
                   <input
                     type="text"
                     required
+                    placeholder="e.g. main.py, index.js, server.jar"
                     value={cfgStartCmd}
                     onChange={e => setCfgStartCmd(e.target.value)}
                     className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
@@ -1012,12 +1013,12 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Install Command (Optional)</label>
+                <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Install File (Optional)</label>
                 <input
                   type="text"
                   value={cfgInstallCmd}
                   onChange={e => setCfgInstallCmd(e.target.value)}
-                  placeholder="e.g. npm install"
+                  placeholder="e.g. requirements.txt, package.json"
                   className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
                 />
               </div>

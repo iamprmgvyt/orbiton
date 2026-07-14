@@ -198,15 +198,25 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user, setActivePage 
   const getRuntimeIcon = (r) => {
     const icons = {
       nodejs: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg',
+      python: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
       python3: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
       java: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg',
       docker: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
       'docker-compose': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
+      go: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg',
       golang: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg',
       rust: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg'
     };
-    const src = icons[r] || 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg';
-    return <img src={src} alt={r} className="w-5 h-5 object-contain" />;
+    const fallbackSrc = 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/chrome/chrome-original.svg';
+    const src = icons[r] || fallbackSrc;
+    return (
+      <img 
+        src={src} 
+        alt={r} 
+        className="w-5 h-5 object-contain" 
+        onError={(e) => { e.target.src = fallbackSrc; }}
+      />
+    );
   };
 
   const getTemplateIcon = (key, t) => {
