@@ -57,6 +57,17 @@ graph TD
 
 ---
 
+## 🤖 Open Source Control Bots
+
+Orbiton supports remote monitoring and power actions directly from Discord and Telegram via 2 plug-and-play bots located in the `bots/` folder:
+
+*   **[Discord Bot (Node.js)](bots/discord-bot/)**: Built with `discord.js`. Supports slash commands (`/status`, `/control`, `/stats`) to view applications and restart servers securely.
+*   **[Telegram Bot (Python)](bots/telegram-bot/)**: Built with `pyTelegramBotAPI`. Supports commands (`/status`, `/control`, `/vps`) to check status and run daemon operations from Telegram chat.
+
+To set up the bots, simply copy `.env.example` to `.env` in the respective bot directory and fill in your Orbiton Panel credentials. Detailed deployment instructions are located in each bot's sub-folder.
+
+---
+
 ## 📦 Installation & Setup
 
 ### Method 1: Auto-Installer (Recommended for Ubuntu VPS)
@@ -125,6 +136,9 @@ orbiton/
 │   └── managers/       # Process spawning & node-pty streams
 ├── frontend/           # React Web Client codebase
 │   └── src/            # Pages, Components, and Utilities
+├── bots/               # Open Source Control Bots (Discord & Telegram)
+│   ├── discord-bot/    # Discord bot controller (Node.js)
+│   └── telegram-bot/   # Telegram bot controller (Python)
 ├── docs/               # Orbiton Documentation Web Site (Vite React)
 ├── install.sh          # Interactive bash installer script
 └── README.md           # Gorgeous project index

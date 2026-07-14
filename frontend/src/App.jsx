@@ -134,7 +134,7 @@ export default function App() {
             <Dashboard onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} />
           )}
           {activePage === 'apps' && (
-            <Apps onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} />
+            <Apps onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} />
           )}
           {activePage === 'app-detail' && selectedAppId && (
             <AppDetail

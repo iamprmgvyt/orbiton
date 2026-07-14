@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
+import { io } from 'socket.io-client';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -31,19 +32,21 @@ export default function Monitor({ onRefreshTrigger }) {
   const [labels, setLabels] = useState(Array(20).fill(''));
   const [cpuLive, setCpuLive] = useState(0);
   const [ramLive, setRamLive] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
-    try {
-      const [stats, procs] = await Promise.all([
-        api('/system/stats'),
-        api('/system/processes')
-      ]);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const socket = io({ auth: { token } });
 
+    // Join metrics room for Node 1
+    socket.emit('metrics:subscribe', { nodeId: 1 });
+
+    socket.on('metrics:data', ({ stats }) => {
       setCpuLive(stats.cpu.usage);
       setRamLive(stats.memory.usedPercent);
-      setProcesses(procs.list || []);
+      setLoading(false);
 
-      const time = new Date().toLocaleTimeString();
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       setCpuHistory(prev => {
         const next = [...prev, stats.cpu.usage];
@@ -62,30 +65,46 @@ export default function Monitor({ onRefreshTrigger }) {
         if (next.length > 20) next.shift();
         return next;
       });
-    } catch (_) {}
-  };
+    });
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+    const fetchProcesses = async () => {
+      try {
+        const procs = await api('/system/processes');
+        setProcesses(procs.list || []);
+      } catch (_) {}
+    };
+
+    fetchProcesses();
+    const procInterval = setInterval(fetchProcesses, 6000);
+
+    return () => {
+      socket.emit('metrics:unsubscribe', { nodeId: 1 });
+      socket.disconnect();
+      clearInterval(procInterval);
+    };
   }, [onRefreshTrigger]);
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 0 },
+    animation: { duration: 300, easing: 'easeOutQuart' },
     plugins: { legend: { display: false } },
     scales: {
       x: { display: false },
       y: {
         min: 0,
         max: 100,
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#64748b', callback: v => v + '%' }
+        grid: { color: 'rgba(255, 255, 255, 0.03)' },
+        ticks: { color: '#64748b', fontSize: 10, callback: v => v + '%' }
       }
     },
-    elements: { point: { radius: 0 } }
+    elements: {
+      point: { radius: 0, hoverRadius: 4 },
+      line: {
+        shadowColor: 'rgba(0, 0, 0, 0.3)',
+        shadowBlur: 10
+      }
+    }
   };
 
   const cpuChartData = {
@@ -93,10 +112,10 @@ export default function Monitor({ onRefreshTrigger }) {
     datasets: [{
       data: cpuHistory,
       borderColor: '#f59e0b',
-      backgroundColor: 'rgba(245, 158, 11, 0.1)',
-      borderWidth: 2,
+      backgroundColor: 'rgba(245, 158, 11, 0.05)',
+      borderWidth: 2.5,
       fill: true,
-      tension: 0.4
+      tension: 0.45
     }]
   };
 
@@ -104,11 +123,11 @@ export default function Monitor({ onRefreshTrigger }) {
     labels,
     datasets: [{
       data: ramHistory,
-      borderColor: '#7c3aed',
-      backgroundColor: 'rgba(124, 58, 237, 0.1)',
-      borderWidth: 2,
+      borderColor: '#a855f7',
+      backgroundColor: 'rgba(168, 85, 247, 0.05)',
+      borderWidth: 2.5,
       fill: true,
-      tension: 0.4
+      tension: 0.45
     }]
   };
 
@@ -117,29 +136,37 @@ export default function Monitor({ onRefreshTrigger }) {
       {/* Chart Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* CPU Chart */}
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
+        <div className="relative bg-surface border border-border/80 rounded-2xl p-6 shadow-xl overflow-hidden group">
+          <div className="absolute top-0 right-0 w-36 h-36 bg-yellow-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
+          <div className="flex items-center justify-between mb-4 relative z-10">
             <div>
-              <h4 className="font-bold text-text">CPU Usage history</h4>
-              <p className="text-xs text-muted mt-1">Real-time usage statistics</p>
+              <h4 className="font-bold text-text">CPU Core Activity</h4>
+              <p className="text-xs text-muted mt-1">Real-time load telemetry stream</p>
             </div>
-            <span className="text-2xl font-extrabold text-yellow-500">{cpuLive}%</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-extrabold text-yellow-500 tracking-tight">{loading ? '...' : cpuLive}</span>
+              <span className="text-xs text-yellow-500/80 font-bold">%</span>
+            </div>
           </div>
-          <div className="h-[200px]">
+          <div className="h-[200px] relative z-10">
             <Line data={cpuChartData} options={chartOptions} />
           </div>
         </div>
 
         {/* RAM Chart */}
-        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
+        <div className="relative bg-surface border border-border/80 rounded-2xl p-6 shadow-xl overflow-hidden group">
+          <div className="absolute top-0 right-0 w-36 h-36 bg-purple-500/10 rounded-full blur-3xl opacity-50 group-hover:opacity-75 transition-opacity"></div>
+          <div className="flex items-center justify-between mb-4 relative z-10">
             <div>
-              <h4 className="font-bold text-text">RAM Usage history</h4>
-              <p className="text-xs text-muted mt-1">Real-time memory statistics</p>
+              <h4 className="font-bold text-text">Memory Utilization</h4>
+              <p className="text-xs text-muted mt-1">Real-time virtual RAM stream</p>
             </div>
-            <span className="text-2xl font-extrabold text-accent">{ramLive}%</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-extrabold text-purple-400 tracking-tight">{loading ? '...' : ramLive}</span>
+              <span className="text-xs text-purple-400/80 font-bold">%</span>
+            </div>
           </div>
-          <div className="h-[200px]">
+          <div className="h-[200px] relative z-10">
             <Line data={ramChartData} options={chartOptions} />
           </div>
         </div>
@@ -148,29 +175,41 @@ export default function Monitor({ onRefreshTrigger }) {
       {/* Processes Table */}
       <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-xl">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-bg2/40">
-          <h3 className="font-bold text-text">Top Host Processes</h3>
+          <div>
+            <h3 className="font-bold text-text">Active Process Threads</h3>
+            <p className="text-xs text-muted mt-0.5">Host kernel subprocess listings</p>
+          </div>
+          <span className="px-2.5 py-1 bg-surface2 border border-border rounded-lg text-xs font-bold text-text2">
+            {processes.length} Processes
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-border text-xs font-bold text-muted uppercase tracking-wider bg-bg2/20">
-                <th className="px-6 py-3.5">PID</th>
-                <th className="px-6 py-3.5">Name</th>
-                <th className="px-6 py-3.5">CPU</th>
-                <th className="px-6 py-3.5">Memory</th>
-                <th className="px-6 py-3.5">Command</th>
+                <th className="px-6 py-3">PID</th>
+                <th className="px-6 py-3">Name</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">CPU %</th>
+                <th className="px-6 py-3">Memory %</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 text-sm">
-              {processes.map((p, i) => (
+              {processes.slice(0, 15).map((p, i) => (
                 <tr key={i} className="hover:bg-surface/30">
-                  <td className="px-6 py-3 font-mono text-muted">{p.pid}</td>
-                  <td className="px-6 py-3 font-semibold text-text">{p.name}</td>
-                  <td className={`px-6 py-3 font-semibold ${p.cpu > 50 ? 'text-red-500' : p.cpu > 20 ? 'text-yellow-500' : 'text-text'}`}>
-                    {p.cpu}%
+                  <td className="px-6 py-3.5 font-mono text-muted">{p.pid}</td>
+                  <td className="px-6 py-3.5 font-bold text-text">{p.name}</td>
+                  <td className="px-6 py-3.5">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      ['running', 'active', 'sleep'].includes(p.status?.toLowerCase())
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-surface2 text-muted border border-border'
+                    }`}>
+                      {p.status || 'unknown'}
+                    </span>
                   </td>
-                  <td className="px-6 py-3 text-text2">{p.mem}%</td>
-                  <td className="px-6 py-3 text-xs text-muted font-mono max-w-[280px] truncate" title={p.cmd}>{p.cmd}</td>
+                  <td className="px-6 py-3.5 font-mono text-yellow-500">{p.cpu?.toFixed(1) || '0.0'}%</td>
+                  <td className="px-6 py-3.5 font-mono text-purple-400">{p.mem?.toFixed(1) || '0.0'}%</td>
                 </tr>
               ))}
             </tbody>

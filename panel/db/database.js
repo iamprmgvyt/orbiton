@@ -102,6 +102,34 @@ function initDatabase() {
     );
   `);
 
+  // Permissions (sub-user scopes per application)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS permissions (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id     INTEGER NOT NULL,
+      app_id      TEXT    NOT NULL,
+      can_power   INTEGER NOT NULL DEFAULT 0,
+      can_files   INTEGER NOT NULL DEFAULT 0,
+      can_console INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE,
+      UNIQUE(user_id, app_id)
+    );
+  `);
+
+  // Backups
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS backups (
+      id          TEXT    PRIMARY KEY,
+      app_id      TEXT    NOT NULL,
+      name        TEXT    NOT NULL,
+      filepath    TEXT    NOT NULL,
+      size        INTEGER NOT NULL,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+    );
+  `);
+
   // Insert default local node if empty
   try {
     const count = db.prepare('SELECT COUNT(*) AS count FROM nodes').get().count;

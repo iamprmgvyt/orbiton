@@ -1,6 +1,159 @@
 import React, { useEffect, useState } from 'react';
 import { api, fmtDate } from '../utils/api';
-import { UserPlus, Trash2, Key, Shield } from 'lucide-react';
+import { UserPlus, Trash2, Shield, Check } from 'lucide-react';
+
+function PermissionsModal({ userId, username, onClose }) {
+  const [apps, setApps] = useState([]);
+  const [permissions, setPermissions] = useState({}); // { [appId]: { can_power: false, can_files: false, can_console: false } }
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const loadData = async () => {
+    try {
+      const [allApps, userPerms] = await Promise.all([
+        api('/apps'),
+        api(`/permissions/${userId}`)
+      ]);
+      setApps(allApps || []);
+
+      const permMap = {};
+      // Initialize with false for all apps
+      allApps.forEach(a => {
+        permMap[a.id] = { can_power: false, can_files: false, can_console: false };
+      });
+      // Merge user permissions from database
+      userPerms.forEach(p => {
+        if (permMap[p.app_id]) {
+          permMap[p.app_id] = {
+            can_power: p.can_power === 1,
+            can_files: p.can_files === 1,
+            can_console: p.can_console === 1
+          };
+        }
+      });
+      setPermissions(permMap);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [userId]);
+
+  const handleCheckboxChange = (appId, field) => {
+    setPermissions(prev => ({
+      ...prev,
+      [appId]: {
+        ...prev[appId],
+        [field]: !prev[appId][field]
+      }
+    }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = Object.entries(permissions).map(([appId, p]) => ({
+        appId,
+        can_power: p.can_power ? 1 : 0,
+        can_files: p.can_files ? 1 : 0,
+        can_console: p.can_console ? 1 : 0
+      })).filter(p => p.can_power || p.can_files || p.can_console); // Only save non-zero scopes
+
+      await api(`/permissions/${userId}`, 'POST', { permissions: payload });
+      alert('User permissions updated successfully.');
+      onClose();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-2xl bg-bg2 border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-bg">
+          <div>
+            <h3 className="font-bold text-text">Sub-User Scopes & Permissions</h3>
+            <p className="text-xs text-muted mt-1">Configuring access for operator user: <strong className="text-accent">{username}</strong></p>
+          </div>
+          <button onClick={onClose} className="text-muted hover:text-text font-bold text-xl">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {loading ? (
+            <div className="text-center text-xs text-muted py-12">Loading application permissions...</div>
+          ) : apps.length === 0 ? (
+            <div className="text-center text-xs text-muted py-12">No hosted apps available to delegate permissions.</div>
+          ) : (
+            <div className="space-y-3">
+              {apps.map(app => {
+                const p = permissions[app.id] || { can_power: false, can_files: false, can_console: false };
+                return (
+                  <div key={app.id} className="bg-surface/50 border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <span className="block text-sm font-bold text-text">{app.name}</span>
+                      <span className="block text-[10px] text-muted font-mono mt-0.5">{app.id}</span>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={p.can_power}
+                          onChange={() => handleCheckboxChange(app.id, 'can_power')}
+                          className="accent-accent w-4 h-4 rounded"
+                        />
+                        Power Actions
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={p.can_files}
+                          onChange={() => handleCheckboxChange(app.id, 'can_files')}
+                          className="accent-accent w-4 h-4 rounded"
+                        />
+                        Files Manager
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={p.can_console}
+                          onChange={() => handleCheckboxChange(app.id, 'can_console')}
+                          className="accent-accent w-4 h-4 rounded"
+                        />
+                        Live Console
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 border-t border-border flex justify-end gap-3 bg-bg/50">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 border border-border rounded-xl text-sm font-semibold hover:bg-surface text-text2"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || loading}
+            className="px-5 py-2.5 bg-accent hover:bg-accent/90 disabled:opacity-50 text-white rounded-xl text-sm font-semibold shadow-lg shadow-accent/15 flex items-center gap-1.5"
+          >
+            {saving ? 'Saving...' : 'Save Permissions'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Users({ currentUser, onRefreshTrigger }) {
   const [users, setUsers] = useState([]);
@@ -9,6 +162,9 @@ export default function Users({ currentUser, onRefreshTrigger }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('user');
+
+  // Permission management state
+  const [selectedUser, setSelectedUser] = useState(null);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -108,11 +264,21 @@ export default function Users({ currentUser, onRefreshTrigger }) {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-text2">{fmtDate(u.created_at)}</td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right flex justify-end gap-2">
+                    {u.id !== currentUser.id && u.role === 'user' && (
+                      <button
+                        onClick={() => setSelectedUser(u)}
+                        className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
+                        title="Configure permissions"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </button>
+                    )}
                     {u.id !== currentUser.id ? (
                       <button
                         onClick={() => handleDeleteUser(u.id, u.username)}
                         className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                        title="Delete user"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -191,6 +357,15 @@ export default function Users({ currentUser, onRefreshTrigger }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Permissions Modal */}
+      {selectedUser && (
+        <PermissionsModal
+          userId={selectedUser.id}
+          username={selectedUser.username}
+          onClose={() => setSelectedUser(null)}
+        />
       )}
     </div>
   );

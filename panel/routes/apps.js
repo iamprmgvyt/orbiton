@@ -10,6 +10,7 @@ const { v4: uuidv4 } = require('uuid');
 const FormData = require('form-data');
 const { db }   = require('../db/database');
 const { daemonRequest, DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi');
+const { checkPermission } = require('../middleware/permission');
 
 const router = express.Router();
 
@@ -137,9 +138,9 @@ router.get('/', async (req, res) => {
       apps = db.prepare(`
         SELECT a.*, u.username AS owner_name
         FROM apps a JOIN users u ON a.owner_id = u.id
-        WHERE a.owner_id = ?
+        WHERE a.owner_id = ? OR a.id IN (SELECT app_id FROM permissions WHERE user_id = ?)
         ORDER BY a.created_at DESC
-      `).all(req.user.id);
+      `).all(req.user.id, req.user.id);
     }
 
     // Batch daemon status request per node
@@ -153,12 +154,25 @@ router.get('/', async (req, res) => {
       } catch (_) {}
     }));
 
-    apps = apps.map(a => ({
-      ...a,
-      env_vars:   JSON.parse(a.env_vars || '{}'),
-      liveStatus: statusMap[a.id]?.status || a.status,
-      pid:        statusMap[a.id]?.pid    || null,
-    }));
+    apps = apps.map(a => {
+      let permissions = { can_power: 1, can_files: 1, can_console: 1 };
+      if (req.user.role !== 'admin' && a.owner_id !== req.user.id) {
+        const dbPerm = db.prepare('SELECT can_power, can_files, can_console FROM permissions WHERE user_id = ? AND app_id = ?').get(req.user.id, a.id);
+        permissions = dbPerm ? {
+          can_power: dbPerm.can_power,
+          can_files: dbPerm.can_files,
+          can_console: dbPerm.can_console
+        } : { can_power: 0, can_files: 0, can_console: 0 };
+      }
+
+      return {
+        ...a,
+        permissions,
+        env_vars:   JSON.parse(a.env_vars || '{}'),
+        liveStatus: statusMap[a.id]?.status || a.status,
+        pid:        statusMap[a.id]?.pid    || null,
+      };
+    });
 
     res.json(apps);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -228,7 +242,23 @@ router.get('/:id', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   const status = await daemonRequest(`/api/apps/${app.id}/status`, 'GET', null, app.node_id).catch(() => ({ status: 'stopped', pid: null }));
-  res.json({ ...app, env_vars: JSON.parse(app.env_vars || '{}'), ...status });
+  
+  let permissions = { can_power: 1, can_files: 1, can_console: 1 };
+  if (req.user.role !== 'admin' && app.owner_id !== req.user.id) {
+    const dbPerm = db.prepare('SELECT can_power, can_files, can_console FROM permissions WHERE user_id = ? AND app_id = ?').get(req.user.id, app.id);
+    permissions = dbPerm ? {
+      can_power: dbPerm.can_power,
+      can_files: dbPerm.can_files,
+      can_console: dbPerm.can_console
+    } : { can_power: 0, can_files: 0, can_console: 0 };
+  }
+
+  res.json({ 
+    ...app, 
+    env_vars: JSON.parse(app.env_vars || '{}'), 
+    permissions,
+    ...status 
+  });
 });
 
 // ─── Update App ───────────────────────────────────────────────
@@ -280,7 +310,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ─── Process Control ──────────────────────────────────────────
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', checkPermission('power'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -290,7 +320,7 @@ router.post('/:id/start', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/stop', async (req, res) => {
+router.post('/:id/stop', checkPermission('power'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -299,7 +329,7 @@ router.post('/:id/stop', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/restart', async (req, res) => {
+router.post('/:id/restart', checkPermission('power'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -309,7 +339,7 @@ router.post('/:id/restart', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/kill', async (req, res) => {
+router.post('/:id/kill', checkPermission('power'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -319,7 +349,7 @@ router.post('/:id/kill', async (req, res) => {
 });
 
 // ─── Send stdin ───────────────────────────────────────────────
-router.post('/:id/input', async (req, res) => {
+router.post('/:id/input', checkPermission('console'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   const { input } = req.body;
@@ -331,7 +361,7 @@ router.post('/:id/input', async (req, res) => {
 });
 
 // ─── Logs ─────────────────────────────────────────────────────
-router.get('/:id/logs', async (req, res) => {
+router.get('/:id/logs', checkPermission('console'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -340,7 +370,7 @@ router.get('/:id/logs', async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/logs/clear', async (req, res) => {
+router.post('/:id/logs/clear', checkPermission('console'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -425,10 +455,20 @@ router.post('/:id/import/docker', async (req, res) => {
 function getAuthorizedApp(req, res) {
   const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(req.params.id);
   if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
-  if (req.user.role !== 'admin' && app.owner_id !== req.user.id) {
-    res.status(403).json({ error: 'Access denied' }); return null;
+  if (req.user.role === 'admin' || app.owner_id === req.user.id) {
+    return app;
   }
-  return app;
+
+  // Check sub-user permission table
+  try {
+    const hasPerm = db.prepare('SELECT 1 FROM permissions WHERE user_id = ? AND app_id = ?').get(req.user.id, app.id);
+    if (hasPerm) {
+      return app;
+    }
+  } catch (_) {}
+
+  res.status(403).json({ error: 'Access denied' });
+  return null;
 }
 
 module.exports = router;

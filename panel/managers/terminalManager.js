@@ -73,6 +73,15 @@ function setupSocketHandlers(ioServer) {
       }
     });
 
+    // Client subscribes to real-time system metrics
+    socket.on('metrics:subscribe', ({ nodeId }) => {
+      socket.join(`metrics:${nodeId}`);
+    });
+
+    socket.on('metrics:unsubscribe', ({ nodeId }) => {
+      socket.leave(`metrics:${nodeId}`);
+    });
+
     // Cleanup on disconnect
     socket.on('disconnect', () => {
       if (daemonSocket) {
@@ -81,6 +90,31 @@ function setupSocketHandlers(ioServer) {
       }
     });
   });
+
+  // Start metrics broadcasting interval
+  startMetricsBroadcaster(ioServer);
+}
+
+function startMetricsBroadcaster(ioServer) {
+  const { daemonRequest } = require('../utils/daemonApi');
+  
+  setInterval(async () => {
+    try {
+      const nodes = db.prepare('SELECT id FROM nodes').all();
+      for (const node of nodes) {
+        const roomName = `metrics:${node.id}`;
+        const clientsInRoom = ioServer.sockets.adapter.rooms.get(roomName);
+        if (clientsInRoom && clientsInRoom.size > 0) {
+          try {
+            const stats = await daemonRequest('/api/system/stats', 'GET', null, node.id);
+            ioServer.to(roomName).emit('metrics:data', { nodeId: node.id, stats });
+          } catch (err) {
+            ioServer.to(roomName).emit('metrics:error', { nodeId: node.id, error: err.message });
+          }
+        }
+      }
+    } catch (_) {}
+  }, 3000); // Poll and broadcast every 3 seconds
 }
 
 module.exports = { setupSocketHandlers };

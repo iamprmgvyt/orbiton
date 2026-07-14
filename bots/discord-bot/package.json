@@ -1,0 +1,14 @@
+{
+  "name": "orbiton-discord-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot to manage Orbiton Panel remotely.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.5"
+  }
+}

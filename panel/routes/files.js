@@ -9,6 +9,10 @@ const { db }   = require('../db/database');
 const { daemonRequest, DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi');
 
 const router = express.Router();
+const { checkPermission } = require('../middleware/permission');
+
+// Apply files scope validation middleware to all routes containing :appId
+router.use('/:appId', checkPermission('files'));
 
 const upload = multer({
   dest: require('os').tmpdir(),
@@ -18,10 +22,20 @@ const upload = multer({
 function checkAppAccess(req, res, appId) {
   const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(appId);
   if (!app) { res.status(404).json({ error: 'Application not found' }); return null; }
-  if (req.user.role !== 'admin' && app.owner_id !== req.user.id) {
-    res.status(403).json({ error: 'Access denied' }); return null;
+  if (req.user.role === 'admin' || app.owner_id === req.user.id) {
+    return app;
   }
-  return app;
+
+  // Check sub-user permission table
+  try {
+    const hasPerm = db.prepare('SELECT 1 FROM permissions WHERE user_id = ? AND app_id = ?').get(req.user.id, app.id);
+    if (hasPerm) {
+      return app;
+    }
+  } catch (_) {}
+
+  res.status(403).json({ error: 'Access denied' });
+  return null;
 }
 
 // GET /api/files/:appId/list?path=/

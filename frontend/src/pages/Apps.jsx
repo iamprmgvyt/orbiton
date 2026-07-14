@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { Server, Play, Square, RotateCw, Terminal, Edit, Trash, Plus, FileCode, CheckCircle } from 'lucide-react';
 
-export default function Apps({ onOpenApp, onRefreshTrigger }) {
+export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -307,47 +307,66 @@ export default function Apps({ onOpenApp, onRefreshTrigger }) {
                 <div className="flex items-center justify-between border-t border-border/50 pt-4 mt-6" onClick={e => e.stopPropagation()}>
                   <span className="text-[10px] text-muted font-mono">Node {app.node_id || 1} • {app.id.slice(0, 8)}...</span>
                   <div className="flex gap-2">
-                    {isRunning ? (
-                      <>
+                    {/* Power Actions (Conditional) */}
+                    {(app.permissions ? app.permissions.can_power === 1 : true) && (
+                      isRunning ? (
+                        <>
+                          <button
+                            onClick={e => handleAction(e, app.id, 'stop')}
+                            className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors"
+                            title="Stop Daemon"
+                          >
+                            <Square className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={e => handleAction(e, app.id, 'restart')}
+                            className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
+                            title="Restart"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
                         <button
-                          onClick={e => handleAction(e, app.id, 'stop')}
-                          className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors"
+                          onClick={e => handleAction(e, app.id, 'start')}
+                          className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors"
+                          title="Start Daemon"
                         >
-                          <Square className="w-3.5 h-3.5" />
+                          <Play className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={e => handleAction(e, app.id, 'restart')}
-                          className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
-                        >
-                          <RotateCw className="w-3.5 h-3.5" />
-                        </button>
-                      </>
-                    ) : (
+                      )
+                    )}
+
+                    {/* Console Action (Conditional) */}
+                    {(app.permissions ? app.permissions.can_console === 1 : true) && (
                       <button
-                        onClick={e => handleAction(e, app.id, 'start')}
-                        className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors"
+                        onClick={() => onOpenApp(app.id, 'console')}
+                        className="p-2 rounded-lg bg-surface2 hover:bg-border text-text2 transition-colors"
+                        title="Interactive Console"
                       >
-                        <Play className="w-3.5 h-3.5" />
+                        <Terminal className="w-3.5 h-3.5" />
                       </button>
                     )}
-                    <button
-                      onClick={() => onOpenApp(app.id, 'console')}
-                      className="p-2 rounded-lg bg-surface2 hover:bg-border text-text2 transition-colors"
-                    >
-                      <Terminal className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={e => handleOpenEdit(e, app)}
-                      className="p-2 rounded-lg bg-surface2 hover:bg-border text-text2 transition-colors"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={e => handleDelete(e, app.id)}
-                      className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
-                    >
-                      <Trash className="w-3.5 h-3.5" />
-                    </button>
+
+                    {/* Edit/Delete Actions (Owner or Admin only) */}
+                    {(user.role === 'admin' || app.owner_id === user.id) && (
+                      <>
+                        <button
+                          onClick={e => handleOpenEdit(e, app)}
+                          className="p-2 rounded-lg bg-surface2 hover:bg-border text-text2 transition-colors"
+                          title="Edit App Settings"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={e => handleDelete(e, app.id)}
+                          className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                          title="Delete App"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

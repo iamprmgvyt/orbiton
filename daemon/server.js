@@ -135,6 +135,89 @@ app.post('/api/apps/:appId/import/docker', async (req, res) => {
 });
 
 
+// ─── Daemon Backup & Restore API ──────────────────────────────
+const archiver = require('archiver');
+const unzipper = require('unzipper');
+
+app.post('/api/apps/:appId/backup/create', async (req, res) => {
+  const { appId } = req.params;
+  const { backupName } = req.body;
+  if (!backupName) return res.status(400).json({ error: 'backupName is required' });
+
+  const DATA_DIR = process.env.DATA_DIR || (process.platform === 'win32' ? path.join(process.env.APPDATA || os.homedir(), 'orbiton-data') : '/opt/orbiton-data');
+  const appDir = path.join(DATA_DIR, 'apps', appId);
+  const backupsDir = path.join(DATA_DIR, 'backups', appId);
+  const destFile = path.join(backupsDir, `${backupName}.zip`);
+
+  try {
+    if (!fs.existsSync(appDir)) return res.status(404).json({ error: 'App workspace folder not found' });
+    fs.mkdirSync(backupsDir, { recursive: true });
+
+    await new Promise((resolve, reject) => {
+      const output = fs.createWriteStream(destFile);
+      const archive = archiver('zip', { zlib: { level: 6 } });
+      output.on('close', resolve);
+      archive.on('error', reject);
+      archive.pipe(output);
+      archive.directory(appDir, false); // Compress contents without the root folder
+      archive.finalize();
+    });
+
+    const stat = fs.statSync(destFile);
+    res.json({ success: true, filename: `${backupName}.zip`, size: stat.size });
+  } catch (err) {
+    res.status(500).json({ error: 'Backup creation failed: ' + err.message });
+  }
+});
+
+app.post('/api/apps/:appId/backup/restore', async (req, res) => {
+  const { appId } = req.params;
+  const { backupName } = req.body;
+  if (!backupName) return res.status(400).json({ error: 'backupName is required' });
+
+  const DATA_DIR = process.env.DATA_DIR || (process.platform === 'win32' ? path.join(process.env.APPDATA || os.homedir(), 'orbiton-data') : '/opt/orbiton-data');
+  const appDir = path.join(DATA_DIR, 'apps', appId);
+  const backupFile = path.join(DATA_DIR, 'backups', appId, `${backupName}.zip`);
+
+  try {
+    if (!fs.existsSync(backupFile)) return res.status(404).json({ error: 'Backup archive file not found' });
+
+    // Clean up current app directory contents
+    if (fs.existsSync(appDir)) {
+      fs.rmSync(appDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(appDir, { recursive: true });
+
+    // Extract backup archive
+    await new Promise((resolve, reject) => {
+      fs.createReadStream(backupFile)
+        .pipe(unzipper.Extract({ path: appDir }))
+        .on('close', resolve)
+        .on('error', reject);
+    });
+
+    res.json({ success: true, message: 'Restore completed successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Restore failed: ' + err.message });
+  }
+});
+
+app.delete('/api/apps/:appId/backup/:backupName', (req, res) => {
+  const { appId, backupName } = req.params;
+  const DATA_DIR = process.env.DATA_DIR || (process.platform === 'win32' ? path.join(process.env.APPDATA || os.homedir(), 'orbiton-data') : '/opt/orbiton-data');
+  const backupFile = path.join(DATA_DIR, 'backups', appId, `${backupName}.zip`);
+
+  try {
+    if (fs.existsSync(backupFile)) {
+      fs.unlinkSync(backupFile);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Backup deletion failed: ' + err.message });
+  }
+});
+
+
 // ─── System telemetry endpoints ───────────────────────────────
 app.get('/api/system/stats', async (req, res) => {
   // Standalone CPU/RAM metrics calculation

@@ -6,6 +6,141 @@ import { io } from 'socket.io-client';
 import 'xterm/css/xterm.css';
 import { Play, Square, RotateCw, Trash2, Cpu, Terminal as TerminalIcon, Info, ClipboardList, Send, ArrowLeft } from 'lucide-react';
 
+function BackupsTab({ appId }) {
+  const [backups, setBackups] = useState([]);
+  const [newBackupName, setNewBackupName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchBackups = async () => {
+    try {
+      const data = await api(`/backups/${appId}`);
+      setBackups(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBackups();
+  }, [appId]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!newBackupName.trim()) return;
+    setCreating(true);
+    try {
+      await api(`/backups/${appId}/create`, 'POST', { name: newBackupName.trim() });
+      setNewBackupName('');
+      fetchBackups();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRestore = async (backupId, name) => {
+    if (!confirm(`Are you sure you want to restore backup "${name}"? All current files will be replaced.`)) return;
+    setRestoring(true);
+    try {
+      await api(`/backups/${appId}/restore/${backupId}`, 'POST');
+      alert('Rollback completed successfully!');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  const handleDelete = async (backupId) => {
+    if (!confirm('Are you sure you want to delete this backup? This action is irreversible.')) return;
+    try {
+      await api(`/backups/${appId}/${backupId}`, 'DELETE');
+      fetchBackups();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const formatSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Create Backup Form */}
+      <form onSubmit={handleCreate} className="bg-bg2/20 border border-border/40 rounded-xl p-4 flex gap-4 items-end">
+        <div className="flex-1">
+          <label className="block text-[10px] text-muted uppercase font-bold tracking-wider mb-2">Create New Backup</label>
+          <input
+            type="text"
+            required
+            placeholder="e.g. Before database migration"
+            value={newBackupName}
+            onChange={e => setNewBackupName(e.target.value)}
+            className="w-full bg-[#030307] border border-border/80 rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={creating || restoring}
+          className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-lg h-[38px] transition-all flex items-center gap-1.5"
+        >
+          {creating ? 'Creating...' : 'Create Backup'}
+        </button>
+      </form>
+
+      {/* Backups List */}
+      <div className="space-y-4">
+        <h4 className="font-bold text-xs text-text2 uppercase tracking-wider">Available Archives</h4>
+        {loading ? (
+          <div className="text-center text-xs text-muted py-6">Loading archives...</div>
+        ) : backups.length === 0 ? (
+          <div className="text-center text-xs text-muted py-12 border border-dashed border-border rounded-xl">
+            No backups available for this application. Create one above!
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {backups.map(b => (
+              <div key={b.id} className="bg-bg2/40 border border-border/40 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <span className="block text-sm font-bold text-text">{b.name}</span>
+                  <span className="block text-xs text-muted mt-1">
+                    Created at {new Date(b.created_at).toLocaleString()} • Size: {formatSize(b.size)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleRestore(b.id, b.name)}
+                    disabled={restoring || creating}
+                    className="bg-green-500/10 hover:bg-green-500/20 text-green-500 font-semibold text-xs px-3 py-1.5 rounded-lg border border-green-500/10 transition-all"
+                  >
+                    {restoring ? 'Restoring...' : 'Rollback'}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(b.id)}
+                    className="text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 p-2 rounded-lg border border-red-500/10 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AppDetail({ appId, initialTab = 'console', onBack, onRefreshTrigger }) {
   const [app, setApp] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,6 +155,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     try {
       const data = await api(`/apps/${appId}`);
       setApp(data);
+      // Auto-fallback activeTab if console permission is missing
+      if (data.permissions && data.permissions.can_console === 0 && activeTab === 'console') {
+        setActiveTab('info');
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -56,6 +195,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   // Init Console Terminal & Load Log History
   useEffect(() => {
     if (activeTab !== 'console' || !app || !terminalRef.current) return;
+    if (app.permissions && app.permissions.can_console === 0) return;
 
     // Initialize Xterm
     const term = new Xterm({
@@ -166,6 +306,8 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   }
 
   const isRunning = app.status === 'running' || app.status === 'starting';
+  const canPower = app.permissions ? app.permissions.can_power === 1 : true;
+  const canConsole = app.permissions ? app.permissions.can_console === 1 : true;
 
   return (
     <div className="space-y-6">
@@ -185,10 +327,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
             <img 
               src={
                 app.runtime === 'nodejs' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg' :
-                app.runtime === 'python3' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg' :
+                app.runtime === 'python' || app.runtime === 'python3' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg' :
                 app.runtime === 'java' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg' :
                 app.runtime === 'docker' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg' :
-                app.runtime === 'golang' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg' :
+                app.runtime === 'go' || app.runtime === 'golang' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg' :
                 app.runtime === 'rust' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg' :
                 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg'
               } 
@@ -218,48 +360,51 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
         </div>
 
         {/* Server Daemon Control Actions */}
-        <div className="flex items-center gap-2">
-          {isRunning ? (
-            <>
+        {canPower && (
+          <div className="flex items-center gap-2">
+            {isRunning ? (
+              <>
+                <button
+                  onClick={() => handleAction('stop')}
+                  className="bg-yellow-500 hover:bg-yellow-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-yellow-500/10 transition-all flex items-center gap-2"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  Stop Daemon
+                </button>
+                <button
+                  onClick={() => handleAction('restart')}
+                  className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-accent/10 transition-all flex items-center gap-2"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  Restart
+                </button>
+              </>
+            ) : (
               <button
-                onClick={() => handleAction('stop')}
-                className="bg-yellow-500 hover:bg-yellow-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-yellow-500/10 transition-all flex items-center gap-2"
+                onClick={() => handleAction('start')}
+                className="bg-green-500 hover:bg-green-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-green-500/10 transition-all flex items-center gap-2"
               >
-                <Square className="w-3.5 h-3.5" />
-                Stop Daemon
+                <Play className="w-3.5 h-3.5" />
+                Start Daemon
               </button>
-              <button
-                onClick={() => handleAction('restart')}
-                className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-accent/10 transition-all flex items-center gap-2"
-              >
-                <RotateCw className="w-3.5 h-3.5" />
-                Restart
-              </button>
-            </>
-          ) : (
+            )}
             <button
-              onClick={() => handleAction('start')}
-              className="bg-green-500 hover:bg-green-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-green-500/10 transition-all flex items-center gap-2"
+              onClick={() => handleAction('kill')}
+              className="bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs px-4 py-2.5 rounded-xl border border-red-500/10 transition-all flex items-center gap-2"
             >
-              <Play className="w-3.5 h-3.5" />
-              Start Daemon
+              <Trash2 className="w-3.5 h-3.5" />
+              Kill Process
             </button>
-          )}
-          <button
-            onClick={() => handleAction('kill')}
-            className="bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs px-4 py-2.5 rounded-xl border border-red-500/10 transition-all flex items-center gap-2"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Kill Process
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-border gap-2 pb-px overflow-x-auto">
         {[
-          { id: 'console', label: '⌨️ Server Console', icon: TerminalIcon },
-          { id: 'info', label: 'ℹ️ Server Info', icon: Info }
+          ...(canConsole ? [{ id: 'console', label: '⌨️ Server Console', icon: TerminalIcon }] : []),
+          { id: 'info', label: 'ℹ️ Server Info', icon: Info },
+          { id: 'backups', label: '🛡️ Backups & Restore', icon: ClipboardList }
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -282,7 +427,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
       {/* Tab Panels */}
       <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl relative min-h-[350px] max-w-full overflow-hidden">
         {/* Console Tab */}
-        {activeTab === 'console' && (
+        {canConsole && activeTab === 'console' && (
           <div className="space-y-4 max-w-full">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted">Real-time server terminal and console history</span>
@@ -334,6 +479,11 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
               </div>
             )}
           </div>
+        )}
+
+        {/* Backups Tab */}
+        {activeTab === 'backups' && (
+          <BackupsTab appId={appId} />
         )}
       </div>
     </div>
