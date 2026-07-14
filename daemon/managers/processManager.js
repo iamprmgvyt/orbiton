@@ -41,10 +41,21 @@ function buildStartCommand(runtime, fileOrCmd) {
   if (!val) return '';
   if (val.includes(' ')) return val; // Already a full command
   
-  if (runtime === 'nodejs') return `node ${val}`;
-  if (runtime === 'python' || runtime === 'python3') return `python3 ${val}`;
-  if (runtime === 'java') return `java -jar ${val}`;
-  if (runtime === 'go' || runtime === 'golang') return `go run ${val}`;
+  if (runtime === 'nodejs') {
+    if (val.endsWith('.ts')) {
+      return `ts-node --esm "${val}"`;
+    }
+    return `node "${val}"`;
+  }
+  if (runtime === 'python' || runtime === 'python3') {
+    return `python3 "${val}"`;
+  }
+  if (runtime === 'java') {
+    return `java -Dterminal.jline=false -Dterminal.ansi=true -jar "${val}"`;
+  }
+  if (runtime === 'go' || runtime === 'golang') {
+    return `go run "${val}"`;
+  }
   return val;
 }
 
@@ -59,7 +70,7 @@ function buildInstallCommand(runtime, fileOrCmd) {
     return 'npm install';
   }
   if (runtime === 'python' || runtime === 'python3') {
-    return `pip install -r ${val} --break-system-packages`;
+    return `pip install -r "${val}" --break-system-packages`;
   }
   return '';
 }

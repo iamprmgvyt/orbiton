@@ -658,6 +658,21 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     };
   }, [activeTab, app?.id]);
 
+  const buildStartCommand = (runtime, fileOrCmd) => {
+    const val = fileOrCmd ? fileOrCmd.trim() : '';
+    if (!val) return '';
+    if (val.includes(' ')) return val; // Already a full command
+    
+    if (runtime === 'nodejs') {
+      if (val.endsWith('.ts')) return `ts-node --esm "${val}"`;
+      return `node "${val}"`;
+    }
+    if (runtime === 'python' || runtime === 'python3') return `python3 "${val}"`;
+    if (runtime === 'java') return `java -Dterminal.jline=false -Dterminal.ansi=true -jar "${val}"`;
+    if (runtime === 'go' || runtime === 'golang') return `go run "${val}"`;
+    return val;
+  };
+
   const handleAction = async (action) => {
     if (action === 'kill') {
       if (!confirm('Are you sure you want to FORCE KILL this process? This might cause data loss.')) return;
@@ -667,14 +682,15 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     const isConsoleActive = activeTab === 'console' && socket;
     
     if (isConsoleActive) {
+      const fullCmd = buildStartCommand(app.runtime, app.start_cmd);
       if (action === 'start') {
-        socket.emit('terminal:input', { input: app.start_cmd + '\r' });
+        socket.emit('terminal:input', { input: fullCmd + '\r' });
       } else if (action === 'stop') {
         socket.emit('terminal:input', { input: '\x03' }); // Send Ctrl+C (SIGINT)
       } else if (action === 'restart') {
         socket.emit('terminal:input', { input: '\x03' }); // Send Ctrl+C
         setTimeout(() => {
-          socket.emit('terminal:input', { input: app.start_cmd + '\r' });
+          socket.emit('terminal:input', { input: fullCmd + '\r' });
         }, 1000);
       }
     }
