@@ -1,24 +1,60 @@
 // ============================================================
-// Orbiton VPS Terminal Discord Bot
-// A secure Discord Bot to manage and run terminal commands on your VPS as root.
+// Orbiton VPS Terminal Discord Bot (SSH Connection Mode)
+// A secure Discord Bot to manage and run terminal commands on your VPS via SSH.
 // Authorized User ID: 1262304052361035857
+// SSH Server: 180.93.106.17 (ubuntu)
 // ============================================================
 
 require('dotenv').config();
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
-const { exec } = require('child_process');
+const SSHClient = require('ssh2').Client;
 const os = require('os');
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const authorizedUserId = process.env.AUTHORIZED_USER_ID || '1262304052361035857';
-const runAsRoot = process.env.RUN_AS_ROOT === 'true';
+
+// SSH Configuration
+const sshConfig = {
+  host: process.env.SSH_HOST || '180.93.106.17',
+  port: parseInt(process.env.SSH_PORT || '22'),
+  username: process.env.SSH_USER || 'ubuntu',
+  password: process.env.SSH_PASS || 'ctG3T2UgLf5EaNcd'
+};
 
 if (!token) {
   console.error('❌ Error: DISCORD_BOT_TOKEN must be configured in .env!');
   process.exit(1);
 }
 
-// Initialize Discord Client with Gateway Intents
+// Helper to execute command over SSH connection
+function executeSSH(command) {
+  return new Promise((resolve, reject) => {
+    const conn = new SSHClient();
+    conn.on('ready', () => {
+      conn.exec(command, (err, stream) => {
+        if (err) {
+          conn.end();
+          return reject(err);
+        }
+        let stdout = '';
+        let stderr = '';
+        
+        stream.on('close', (code, signal) => {
+          conn.end();
+          resolve({ stdout, stderr, code });
+        }).on('data', (data) => {
+          stdout += data.toString();
+        }).stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+      });
+    }).on('error', (err) => {
+      reject(err);
+    }).connect(sshConfig);
+  });
+}
+
+// Initialize Discord Client
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -28,11 +64,11 @@ const client = new Client({
 });
 
 client.once('ready', () => {
-  console.log(`🪐 Orbiton VPS Terminal Discord Bot is active as ${client.user.tag}!`);
+  console.log(`🪐 Orbiton VPS Terminal Discord Bot (SSH Mode) is active as ${client.user.tag}!`);
   console.log(`🔐 Authorization locked to Discord User ID: ${authorizedUserId}`);
-  console.log(`👑 Root execution mode: ${runAsRoot ? 'ENABLED (sudo)' : 'DISABLED'}`);
+  console.log(`🌐 Target Host: ${sshConfig.username}@${sshConfig.host}:${sshConfig.port}`);
   
-  client.user.setActivity('VPS Shell Console', { type: ActivityType.Listening });
+  client.user.setActivity('VPS SSH Console', { type: ActivityType.Listening });
 });
 
 // Security Gatekeeper helper
@@ -56,13 +92,13 @@ client.on('messageCreate', async (message) => {
     if (!isAuthorized(message)) return;
 
     const helpMsg = `
-🪐 **Orbiton VPS Terminal Discord Bot**
+🪐 **Orbiton VPS Terminal Discord Bot (SSH Connection Mode)**
 Secure command execution active for user ID: \`${authorizedUserId}\`.
 
 **Available Shortcuts:**
-📊 \`!stats\` - View system statistics (CPU, RAM, Disk, Uptime)
-⚡ \`!run <command>\` - Run any shell command on VPS
-🔄 \`!reboot\` - Reboot the VPS server
+📊 \`!stats\` - View system statistics (CPU, RAM, Disk, Uptime) via SSH
+⚡ \`!run <command>\` - Run any shell command on VPS via SSH
+🔄 \`!reboot\` - Reboot the VPS server via SSH
     `;
     message.reply(helpMsg);
   }
@@ -71,13 +107,11 @@ Secure command execution active for user ID: \`${authorizedUserId}\`.
   else if (content === '!stats') {
     if (!isAuthorized(message)) return;
 
-    const statusMsg = await message.reply('📊 Gathering VPS system metrics, please wait...');
+    const statusMsg = await message.reply('📊 Connecting to VPS and gathering system metrics, please wait...');
 
-    exec('free -m && df -h / && uptime', (err, stdout, stderr) => {
-      if (err) {
-        return statusMsg.edit(`❌ Error retrieving stats: \`${err.message}\``);
-      }
-
+    try {
+      // Execute metrics commands over SSH
+      const { stdout } = await executeSSH('free -m && df -h / && uptime');
       const lines = stdout.split('\n');
       
       // Parse RAM info
@@ -102,38 +136,34 @@ Secure command execution active for user ID: \`${authorizedUserId}\`.
       const uptimeLine = lines[lines.length - 2] || 'N/A';
 
       const statsText = `
-📊 **VPS System Status:**
-👑 **Execution Mode:** \`${runAsRoot ? 'root (sudo)' : 'standard'}\`
-🖥️ **Hostname:** \`${os.hostname()}\`
-🔋 **OS Platform:** \`${os.type()} ${os.release()}\`
-🧠 **CPU Cores:** \`${os.cpus().length} cores\`
-💡 **RAM Usage:** \`${ramUsage}\`
+📊 **VPS System Status (SSH Mode):**
+🌐 **Target Host:** \`${sshConfig.username}@${sshConfig.host}\`
+🔋 **RAM Usage:** \`${ramUsage}\`
 💾 **Disk Usage:** \`${diskUsage}\`
 ⏱️ **System Uptime:** \`${uptimeLine.trim()}\`
       `;
 
       statusMsg.edit(statsText);
-    });
+    } catch (err) {
+      statusMsg.edit(`❌ SSH Error retrieving stats: \`${err.message}\``);
+    }
   }
 
   // ─── Command: !run <command> ──────────────────────────────────
   else if (content.startsWith('!run ')) {
     if (!isAuthorized(message)) return;
 
-    const rawCommand = content.substring(5).trim();
-    if (!rawCommand) return message.reply('❌ Please specify a command. Example: `!run df -h`');
+    const command = content.substring(5).trim();
+    if (!command) return message.reply('❌ Please specify a command. Example: `!run df -h`');
 
-    // If configured to run as root, prefix with sudo (unless already sudoed)
-    const command = (runAsRoot && !rawCommand.startsWith('sudo')) ? `sudo ${rawCommand}` : rawCommand;
+    const statusMsg = await message.reply(`⚡ Executing SSH command: \`${command}\`...`);
 
-    const statusMsg = await message.reply(`⚡ Executing command: \`${command}\`...`);
-
-    // Execute command with a large buffer (5MB)
-    exec(command, { maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
+    try {
+      const { stdout, stderr, code } = await executeSSH(command);
       let response = '';
 
-      if (err) {
-        response += `❌ **Command failed with exit code:** \`${err.code || 1}\`\n\n`;
+      if (code !== 0) {
+        response += `❌ **Command failed with exit code:** \`${code}\`\n\n`;
       }
 
       const output = (stdout || '') + (stderr || '');
@@ -149,10 +179,11 @@ Secure command execution active for user ID: \`${authorizedUserId}\`.
       }
 
       statusMsg.edit(response).catch(() => {
-        // Fallback in case message payload still exceeds limit
         message.reply('❌ Output payload was too large for Discord to display. Please refine your command parameters.');
       });
-    });
+    } catch (err) {
+      statusMsg.edit(`❌ SSH Execution Error: \`${err.message}\``);
+    }
   }
 
   // ─── Command: !reboot ─────────────────────────────────────────
@@ -165,13 +196,14 @@ Secure command execution active for user ID: \`${authorizedUserId}\`.
   else if (content === '!confirm_reboot') {
     if (!isAuthorized(message)) return;
 
-    await message.reply('🔄 Initiating system reboot now... Connection will close.');
+    await message.reply('🔄 Initiating SSH system reboot now... Connection will close.');
 
-    exec('sudo reboot', (err) => {
-      if (err) {
-        message.reply(`❌ Reboot failed: \`${err.message}\` (Check if sudo passwordless reboot is enabled for the bot user)`);
-      }
-    });
+    try {
+      // Execute reboot with password via stdin/sudo reboot -S if needed, or passwordless
+      await executeSSH('echo "ctG3T2UgLf5EaNcd" | sudo -S reboot');
+    } catch (err) {
+      message.reply(`❌ Reboot failed: \`${err.message}\``);
+    }
   }
 });
 
