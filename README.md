@@ -91,6 +91,34 @@ sudo bash install.sh
 * **`[4]` Uninstall:** Purges Orbiton and all systemd daemons.
 * **`[5]` Update Orbiton:** Pulls the latest version from GitHub, rebuilds dependencies, and restarts services.
 
+### 🪐 Orbiton Global Command Line Interface (CLI)
+
+Once installed, the global `orbiton` command is registered to your VPS. You can manage your panel and daemon node services using these short, easy commands:
+
+```bash
+# Start all Orbiton services
+sudo orbiton start
+
+# Stop all Orbiton services
+sudo orbiton stop
+
+# Restart Panel and Daemon (equivalent to complex service reload scripts)
+sudo orbiton restart
+
+# Monitor live systemd journal console logs
+sudo orbiton logs
+
+# Check service daemon health status
+sudo orbiton status
+
+# Trigger auto-update from GitHub
+sudo orbiton update
+
+# View CLI version and help menu
+sudo orbiton version
+sudo orbiton help
+```
+
 ---
 
 ### Method 2: Manual Developer Setup

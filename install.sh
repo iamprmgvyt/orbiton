@@ -280,6 +280,18 @@ update_orbiton() {
   exit 0
 }
 
+install_cli() {
+  echo -e "${YELLOW}Registering 'orbiton' global command...${NC}"
+  cp "$SCRIPT_DIR/orbiton.sh" /usr/local/bin/orbiton 2>/dev/null || true
+  chmod +x /usr/local/bin/orbiton 2>/dev/null || true
+  
+  # Also keep a copy of the installer so update script works
+  mkdir -p /opt/orbiton-installer
+  cp "$SCRIPT_DIR/install.sh" /opt/orbiton-installer/install.sh 2>/dev/null || true
+  cp "$SCRIPT_DIR/orbiton.sh" /opt/orbiton-installer/orbiton.sh 2>/dev/null || true
+  echo -e "${GREEN}✔ You can now run Orbiton CLI commands globally! Try: 'orbiton help'${NC}"
+}
+
 uninstall_orbiton() {
   echo -e "\n${RED}🛑 Uninstalling Orbiton Panel and Daemon...${NC}"
   systemctl stop orbiton-panel --quiet 2>/dev/null || true
@@ -304,6 +316,11 @@ uninstall_orbiton() {
 }
 
 welcome
+
+if [ "$1" == "--update" ]; then
+  update_orbiton
+  exit 0
+fi
 
 done=false
 while [ "$done" == false ]; do
@@ -370,6 +387,8 @@ while [ "$done" == false ]; do
       ;;
   esac
 done
+
+install_cli
 
 echo -e "\n${GREEN}${BOLD}================================================${NC}"
 echo -e "${GREEN}${BOLD}🪐 Orbiton Setup Completed Successfully!        ${NC}"
