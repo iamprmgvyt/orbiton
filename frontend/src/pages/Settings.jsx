@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { api, removeToken } from '../utils/api';
-import { Key, ShieldAlert, Plus, Trash2, Globe, RefreshCw } from 'lucide-react';
+import { 
+  Key, 
+  ShieldAlert, 
+  Plus, 
+  Trash2, 
+  Globe, 
+  RefreshCw, 
+  Palette, 
+  Puzzle, 
+  Upload, 
+  Check 
+} from 'lucide-react';
 
-export default function Settings() {
+export default function Settings({ theme, setTheme }) {
   const [activeTab, setActiveTab] = useState('password');
   
   // Password states
@@ -19,8 +30,24 @@ export default function Settings() {
   const [newProtocol, setNewProtocol] = useState('tcp');
   const [fwActionLoading, setFwActionLoading] = useState(false);
 
+  // Blueprint states
+  const [blueprints, setBlueprints] = useState([]);
+  const [bpLoading, setBpLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [bpFile, setBpFile] = useState(null);
+  const [bpMessage, setBpMessage] = useState('');
+
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = user.role === 'admin';
+
+  // Available Themes definition
+  const THEMES = [
+    { id: 'theme-cyberpunk', name: 'Cyberpunk Neon', bg: '#060612', accent: '#7c3aed', text: '#f1f5f9', desc: 'Default Dark Mode with purple/blue glowing accents.' },
+    { id: 'theme-ocean', name: 'Deep Ocean', bg: '#030a16', accent: '#0d9488', text: '#e2e8f0', desc: 'Sleek dark theme with oceanic teal & cyan tones.' },
+    { id: 'theme-emerald', name: 'Forest Emerald', bg: '#02140e', accent: '#10b981', text: '#e6f4ea', desc: 'Calming dark green palette styled with emerald hints.' },
+    { id: 'theme-sakura', name: 'Sakura Dream', bg: '#150d12', accent: '#ec4899', text: '#faeaf1', desc: 'Premium dark-plum theme styled with sakura blossom pinks.' },
+    { id: 'theme-nordic', name: 'Nordic Light', bg: '#f8fafc', accent: '#6d28d9', text: '#0f172a', desc: 'Modern and clean Light Mode with slate contrast.' },
+  ];
 
   const loadFirewall = async () => {
     if (!isAdmin) return;
@@ -36,10 +63,22 @@ export default function Settings() {
     }
   };
 
-  useEffect(() => {
-    if (activeTab === 'firewall') {
-      loadFirewall();
+  const loadBlueprints = async () => {
+    if (!isAdmin) return;
+    setBpLoading(true);
+    try {
+      const data = await api('/blueprint/list');
+      setBlueprints(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBpLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'firewall') loadFirewall();
+    if (activeTab === 'blueprint') loadBlueprints();
   }, [activeTab]);
 
   const handlePasswordSubmit = async (e) => {
@@ -97,6 +136,38 @@ export default function Settings() {
     }
   };
 
+  // Upload blueprint extension handler
+  const handleBlueprintUpload = async (e) => {
+    e.preventDefault();
+    if (!bpFile) return;
+    setUploading(true);
+    setBpMessage('Uploading and extracting extension package...');
+
+    const formData = new FormData();
+    formData.append('file', bpFile);
+
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/blueprint/install', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to install extension');
+
+      setBpMessage(data.message);
+      setBpFile(null);
+      loadBlueprints();
+      alert('Blueprint extension installed successfully! Rebuild triggered in background.');
+    } catch (err) {
+      setBpMessage(`❌ Installation Error: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Navigation tabs */}
@@ -112,18 +183,42 @@ export default function Settings() {
           <Key className="w-4 h-4" />
           Password Settings
         </button>
+        <button
+          onClick={() => setActiveTab('theme')}
+          className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
+            activeTab === 'theme'
+              ? 'border-accent text-accent bg-accent/5'
+              : 'border-transparent text-muted hover:text-text'
+          }`}
+        >
+          <Palette className="w-4 h-4" />
+          Giao diện & Themes
+        </button>
         {isAdmin && (
-          <button
-            onClick={() => setActiveTab('firewall')}
-            className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
-              activeTab === 'firewall'
-                ? 'border-accent text-accent bg-accent/5'
-                : 'border-transparent text-muted hover:text-text'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            Node Firewall (UFW)
-          </button>
+          <>
+            <button
+              onClick={() => setActiveTab('firewall')}
+              className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
+                activeTab === 'firewall'
+                  ? 'border-accent text-accent bg-accent/5'
+                  : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              Node Firewall (UFW)
+            </button>
+            <button
+              onClick={() => setActiveTab('blueprint')}
+              className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
+                activeTab === 'blueprint'
+                  ? 'border-accent text-accent bg-accent/5'
+                  : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              <Puzzle className="w-4 h-4" />
+              Blueprint Extensions
+            </button>
+          </>
         )}
       </div>
 
@@ -179,6 +274,60 @@ export default function Settings() {
               Update Password
             </button>
           </form>
+        </div>
+      )}
+
+      {/* Theme Customizer Tab */}
+      {activeTab === 'theme' && (
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl space-y-6">
+          <div>
+            <h3 className="font-bold text-text">Choose Color Theme Palette</h3>
+            <p className="text-xs text-muted mt-1">Select your preferred Orbiton styling color profile. Theme applies instantly to all components.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {THEMES.map((t) => {
+              const isSelected = theme === t.id;
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`border rounded-2xl p-5 cursor-pointer transition-all flex items-start justify-between gap-4 hover:border-accent ${
+                    isSelected ? 'border-accent bg-accent/5' : 'border-border bg-bg2/40'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <span className="block text-sm font-bold text-text">{t.name}</span>
+                    <span className="block text-xs text-muted">{t.desc}</span>
+                  </div>
+
+                  {/* Palette Preview Dots */}
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-4 h-4 rounded-full border border-white/20" 
+                      style={{ backgroundColor: t.bg }} 
+                      title="Background"
+                    />
+                    <div 
+                      className="w-4 h-4 rounded-full border border-white/20" 
+                      style={{ backgroundColor: t.accent }} 
+                      title="Accent"
+                    />
+                    <div 
+                      className="w-4 h-4 rounded-full border border-white/20" 
+                      style={{ backgroundColor: t.text }} 
+                      title="Text"
+                    />
+                    {isSelected && (
+                      <div className="bg-accent text-white p-1 rounded-full ml-1">
+                        <Check className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -307,6 +456,91 @@ export default function Settings() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Blueprint Extensions Installer Tab */}
+      {activeTab === 'blueprint' && isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Upload Card */}
+          <div className="md:col-span-1 space-y-6">
+            <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
+              <h3 className="font-bold text-text mb-2">Install Extension Package</h3>
+              <p className="text-xs text-muted mb-6">Upload a Pterodactyl-compatible blueprint extension (.zip) to extend Orbiton's capabilities.</p>
+
+              <form onSubmit={handleBlueprintUpload} className="space-y-4">
+                <div className="border border-dashed border-border hover:border-accent rounded-xl p-6 text-center cursor-pointer relative bg-bg2/10">
+                  <input
+                    type="file"
+                    required
+                    accept=".zip"
+                    onChange={e => setBpFile(e.target.files[0])}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <Upload className="w-8 h-8 text-muted mx-auto mb-2" />
+                  <span className="block text-xs font-semibold text-text2">
+                    {bpFile ? bpFile.name : 'Select blueprint.zip file'}
+                  </span>
+                  <span className="block text-[10px] text-muted mt-1">Accepts standard .zip packages</span>
+                </div>
+
+                {bpMessage && (
+                  <div className="bg-[#030307] border border-border rounded-xl p-3 text-[10px] font-mono text-text2 max-h-[120px] overflow-y-auto break-words">
+                    {bpMessage}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={uploading || !bpFile}
+                  className="w-full bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-sm px-5 py-3 rounded-xl shadow-lg shadow-accent/15 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4" />
+                  {uploading ? 'Installing...' : 'Install Extension'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Installed Extensions list */}
+          <div className="md:col-span-2 bg-surface border border-border rounded-2xl p-6 shadow-xl">
+            <h3 className="font-bold text-text mb-4 flex items-center gap-2">
+              <Puzzle className="w-5 h-5 text-accent" />
+              Installed Extensions ({blueprints.length})
+            </h3>
+
+            {bpLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <div className="w-8 h-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
+              </div>
+            ) : blueprints.length === 0 ? (
+              <div className="text-center py-20 border border-dashed border-border rounded-xl">
+                <span className="text-4xl block mb-2">🔌</span>
+                <h4 className="font-bold text-text">No extensions installed</h4>
+                <p className="text-xs text-muted mt-1 max-w-xs mx-auto">Upload a blueprint.zip extension on the left card to add features and themes to your Panel.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {blueprints.map((bp) => (
+                  <div key={bp.id} className="bg-bg2/40 border border-border/40 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="block text-sm font-bold text-text">{bp.name}</span>
+                        <span className="px-2 py-0.5 rounded text-[8px] font-bold bg-accent/10 border border-accent/20 text-accent">
+                          v{bp.version}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted mt-1 leading-relaxed">{bp.description}</p>
+                      <span className="block text-[10px] text-muted mt-2">
+                        Author: <span className="font-bold text-text2">{bp.author}</span> • Installed at {new Date(bp.installedAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

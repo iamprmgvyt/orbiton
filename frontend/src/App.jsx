@@ -19,15 +19,14 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [theme, setTheme] = useState(localStorage.getItem('orbiton_theme') || 'dark');
+  const [theme, setTheme] = useState(localStorage.getItem('orbiton_theme') || 'theme-cyberpunk');
 
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('light');
-    } else {
-      root.classList.remove('light');
-    }
+    // Remove all old theme classes
+    root.className = '';
+    // Apply new theme class
+    root.classList.add(theme);
     localStorage.setItem('orbiton_theme', theme);
   }, [theme]);
 
@@ -173,7 +172,7 @@ export default function App() {
             <Nodes onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'settings' && (
-            <Settings />
+            <Settings theme={theme} setTheme={setTheme} />
           )}
         </main>
       </div>

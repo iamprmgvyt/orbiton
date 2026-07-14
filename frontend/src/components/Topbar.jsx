@@ -35,11 +35,11 @@ export default function Topbar({ activePage, onRefresh, onOpenSidebar, theme, se
       {/* Action Buttons */}
       <div className="flex items-center gap-3">
         <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => setTheme(theme === 'theme-nordic' ? 'theme-cyberpunk' : 'theme-nordic')}
           className="p-2.5 rounded-xl border border-border text-text2 hover:bg-surface hover:text-text transition-colors flex items-center justify-center"
           title="Toggle Light/Dark Theme"
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          {theme === 'theme-nordic' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
         </button>
         <button
           onClick={onRefresh}

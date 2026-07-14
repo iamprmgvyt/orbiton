@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 :root {
+  /* Cyberpunk Neon (Default Dark) */
   --bg: #060612;
   --bg2: #0d0d1e;
   --surface: rgba(255, 255, 255, 0.035);
@@ -17,7 +18,71 @@
   --muted: #64748b;
 }
 
-:root.light {
+.theme-cyberpunk {
+  --bg: #060612;
+  --bg2: #0d0d1e;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.13);
+  --accent: #7c3aed;
+  --accent2: #3b82f6;
+  --accent3: #a855f7;
+  --text: #f1f5f9;
+  --text2: #cbd5e1;
+  --muted: #64748b;
+}
+
+.theme-ocean {
+  /* Deep Ocean Blue */
+  --bg: #030a16;
+  --bg2: #07152b;
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface2: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.07);
+  --border2: rgba(255, 255, 255, 0.11);
+  --accent: #0d9488;
+  --accent2: #06b6d4;
+  --accent3: #0f766e;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --muted: #475569;
+}
+
+.theme-emerald {
+  /* Forest Emerald */
+  --bg: #02140e;
+  --bg2: #05261b;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.12);
+  --accent: #10b981;
+  --accent2: #059669;
+  --accent3: #047857;
+  --text: #e6f4ea;
+  --text2: #a8dbb5;
+  --muted: #4b6b55;
+}
+
+.theme-sakura {
+  /* Sakura Dream */
+  --bg: #150d12;
+  --bg2: #24151e;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.12);
+  --accent: #ec4899;
+  --accent2: #f43f5e;
+  --accent3: #db2777;
+  --text: #faeaf1;
+  --text2: #f5b7d6;
+  --muted: #735062;
+}
+
+.theme-nordic {
+  /* Nordic Light (Sleek Light Mode) */
   --bg: #f8fafc;
   --bg2: #ffffff;
   --surface: rgba(15, 23, 42, 0.02);
