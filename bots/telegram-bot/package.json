@@ -1,0 +1,14 @@
+{
+  "name": "orbiton-telegram-bot-nodejs",
+  "version": "1.0.0",
+  "description": "Telegram Bot Node.js to manage Orbiton Panel remotely.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.64.0",
+    "axios": "^1.6.7",
+    "dotenv": "^16.4.5"
+  }
+}

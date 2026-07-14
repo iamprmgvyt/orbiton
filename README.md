@@ -61,10 +61,10 @@ graph TD
 
 Orbiton supports remote monitoring and power actions directly from Discord and Telegram via 2 plug-and-play bots located in the `bots/` folder:
 
-*   **[Discord Bot (Node.js)](bots/discord-bot/)**: Built with `discord.js`. Supports slash commands (`/status`, `/control`, `/stats`) to view applications and restart servers securely.
-*   **[Telegram Bot (Python)](bots/telegram-bot/)**: Built with `pyTelegramBotAPI`. Supports commands (`/status`, `/control`, `/vps`) to check status and run daemon operations from Telegram chat.
+*   **[Discord Bot](bots/discord-bot/)**: Contains both **Node.js (JavaScript)** and **Python** versions. Supports slash commands (`/status`, `/control`, `/stats`) to view applications and restart servers securely.
+*   **[Telegram Bot](bots/telegram-bot/)**: Contains both **Python** and **Node.js (JavaScript)** versions. Supports commands (`/status`, `/control`, `/vps`) to check status and run daemon operations from Telegram chat.
 
-To set up the bots, simply copy `.env.example` to `.env` in the respective bot directory and fill in your Orbiton Panel credentials. Detailed deployment instructions are located in each bot's sub-folder.
+To set up the bots, simply copy `.env.example` to `.env` in the respective bot directory and fill in your Orbiton Panel credentials. Detailed deployment instructions for both Node.js and Python are located in each bot's sub-folder.
 
 ---
 
