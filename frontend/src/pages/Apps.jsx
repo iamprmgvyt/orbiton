@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../utils/api';
 import { Server, Play, Square, RotateCw, Terminal, Edit, Trash, Plus, FileCode, CheckCircle } from 'lucide-react';
 
-export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
+export default function Apps({ onOpenApp, onRefreshTrigger, user, setActivePage }) {
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,23 +61,8 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
   };
 
   const handleOpenCreate = () => {
-    setAppId(null);
-    setName('');
-    setRuntime('nodejs');
-    setStartCmd('node index.js');
-    setInstallCmd('');
-    setMaxRam(512);
-    setAutoRestart(true);
-    setEnvVars('{}');
-    setImportType('manual');
-    setGitUrl('');
-    setGitBranch('main');
-    setZipFile(null);
-    setDockerImage('');
-    setSelectedTemplate('');
-    setTplEnv('');
-    setSelectedNodeId(1);
-    setIsModalOpen(true);
+    setActivePage('create-new-app');
+    history.pushState({ page: 'create-new-app' }, '', '/create-new-app');
   };
 
   const handleRuntimeChange = (val) => {

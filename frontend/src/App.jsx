@@ -11,6 +11,7 @@ import Runtimes from './pages/Runtimes';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Nodes from './pages/Nodes';
+import CreateNewApp from './pages/CreateNewApp';
 import { getToken, getUser, removeToken } from './utils/api';
 
 export default function App() {
@@ -57,7 +58,7 @@ export default function App() {
         setActivePage('app-detail');
       } else if (path === '/dashboard') {
         setActivePage('dashboard');
-      } else if (['/apps', '/files', '/monitor', '/runtimes', '/users', '/settings'].includes(path)) {
+      } else if (['/apps', '/files', '/monitor', '/runtimes', '/users', '/settings', '/create-new-app'].includes(path)) {
         setActivePage(path.substring(1));
       } else {
         setActivePage('dashboard');
@@ -146,7 +147,10 @@ export default function App() {
             <Dashboard onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} />
           )}
           {activePage === 'apps' && (
-            <Apps onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} />
+            <Apps onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} setActivePage={handlePageChange} />
+          )}
+          {activePage === 'create-new-app' && (
+            <CreateNewApp onBack={handleBackToApps} onRefresh={handleRefresh} />
           )}
           {activePage === 'app-detail' && selectedAppId && (
             <AppDetail
