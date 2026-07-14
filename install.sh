@@ -20,6 +20,7 @@ PANEL_DIR="/opt/orbiton-panel"
 DAEMON_DIR="/opt/orbiton-daemon"
 DATA_DIR="/opt/orbiton-data"
 LOG_PATH="/var/log/orbiton-installer.log"
+PANEL_PORT=3000
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; NC='\033[0m'; BOLD='\033[1m'
@@ -150,11 +151,32 @@ install_panel() {
   cd "$PANEL_DIR"
   npm install --omit=dev >> $LOG_PATH 2>&1
 
+  # Network Port Selection Prompt
+  echo -e "\n${YELLOW}* Configure Panel Network Port:${NC}"
+  echo -e "  [1] Run directly on Main IP (Port 80)"
+  echo -e "  [2] Run on a Custom Port (Default: 3000)"
+  echo -n -e "  Select option [1-2, Default: 2]: "
+  read -r port_choice
+
+  if [ "$port_choice" == "1" ]; then
+    PANEL_PORT=80
+    echo -e "  ${GREEN}✔ Panel configured to run on Port 80 (Main IP).${NC}"
+  else
+    echo -n -e "  Enter custom port [Default: 3000]: "
+    read -r custom_port
+    if [ ! -z "$custom_port" ]; then
+      PANEL_PORT=$custom_port
+    else
+      PANEL_PORT=3000
+    fi
+    echo -e "  ${GREEN}✔ Panel configured to run on Port ${PANEL_PORT}.${NC}"
+  fi
+
   # Create .env
   JWT_SECRET=$(openssl rand -hex 32)
   DAEMON_TOKEN="orbiton_daemon_secret_$(openssl rand -hex 16)"
   cat > "$PANEL_DIR/.env" << EOF
-PORT=3000
+PORT=${PANEL_PORT}
 SSL_PORT=3443
 JWT_SECRET=${JWT_SECRET}
 NODE_ENV=production
@@ -435,7 +457,11 @@ echo -e "\n${GREEN}${BOLD}================================================${NC}"
 echo -e "${GREEN}${BOLD}🪐 Orbiton Setup Completed Successfully!        ${NC}"
 echo -e "${GREEN}${BOLD}================================================${NC}"
 PUBLIC_IP=$(curl -s4 ifconfig.me || curl -s4 api.ipify.org || hostname -I | awk '{print $1}')
-echo -e "  Panel Access:  ${BOLD}http://${PUBLIC_IP}:3000${NC}"
+if [ "$PANEL_PORT" == "80" ]; then
+  echo -e "  Panel Access:  ${BOLD}http://${PUBLIC_IP}${NC}"
+else
+  echo -e "  Panel Access:  ${BOLD}http://${PUBLIC_IP}:${PANEL_PORT}${NC}"
+fi
 echo -e "  Default Admin: ${BOLD}Set up on first web browser access${NC}"
 echo -e "  Log file:      ${BOLD}$LOG_PATH${NC}"
 echo -e "  ${YELLOW}Thank you for choosing Orbiton!${NC}\n"
