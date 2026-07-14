@@ -157,25 +157,31 @@ function initDatabase() {
     );
   `);
 
-  // Insert default local node if empty
+  // Auto-sync or insert default Local Node (id = 1) based on current environment variables
   try {
-    const count = db.prepare('SELECT COUNT(*) AS count FROM nodes').get().count;
-    if (count === 0) {
-      const daemonUrl = process.env.DAEMON_URL || 'http://localhost:9900';
-      let ip = '127.0.0.1';
-      let port = 9900;
-      try {
-        const u = new URL(daemonUrl);
-        ip = u.hostname;
-        port = parseInt(u.port) || 9900;
-      } catch (_) {}
-      
+    const daemonUrl = process.env.DAEMON_URL || 'http://localhost:9900';
+    let ip = '127.0.0.1';
+    let port = 9900;
+    try {
+      const u = new URL(daemonUrl);
+      ip = u.hostname;
+      port = parseInt(u.port) || 9900;
+    } catch (_) {}
+    const token = process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123';
+
+    const node1 = db.prepare('SELECT * FROM nodes WHERE id = 1').get();
+    if (node1) {
+      db.prepare('UPDATE nodes SET ip = ?, port = ?, token = ? WHERE id = 1').run(ip, port, token);
+      console.log(`[Database Sync] Synced Local Node (id=1) settings to: http://${ip}:${port}`);
+    } else {
       db.prepare(`
-        INSERT INTO nodes (name, ip, port, token)
-        VALUES (?, ?, ?, ?)
-      `).run('Local Node', ip, port, process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123');
+        INSERT INTO nodes (id, name, ip, port, token)
+        VALUES (1, ?, ?, ?, ?)
+      `).run('Local Node', ip, port, token);
     }
-  } catch (_) {}
+  } catch (err) {
+    console.error(`[Database Sync Error]`, err.message);
+  }
 
   // Migration: install_cmd
   try {

@@ -60,7 +60,6 @@ app.use('/api/permissions', authMiddleware, require('./routes/permissions'));
 app.use('/api/backups',     authMiddleware, require('./routes/backups'));
 app.use('/api/domains',     authMiddleware, require('./routes/domains'));
 app.use('/api/crons',       authMiddleware, require('./routes/crons'));
-app.use('/api/blueprint',   authMiddleware, require('./routes/blueprint'));
 
 // Catch-all → serve React frontend SPA index.html
 app.get('*', (req, res) => {
