@@ -54,7 +54,7 @@ export default function App() {
       if (m) {
         const [, appId, tab] = m;
         setSelectedAppId(appId);
-        setInitialDetailTab(tab || 'logs');
+        setInitialDetailTab(tab || 'console');
         setActivePage('app-detail');
       } else if (path === '/dashboard') {
         setActivePage('dashboard');

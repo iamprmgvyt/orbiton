@@ -18,7 +18,8 @@ import {
   Globe, 
   Calendar, 
   ShieldAlert,
-  Download
+  Download,
+  Settings as SettingsIcon
 } from 'lucide-react';
 
 // ─── Backups Tab Component ─────────────────────────────────────
@@ -467,6 +468,16 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   const fitAddonInstance = useRef(null);
   const socketRef = useRef(null);
 
+  // Settings Form States
+  const [cfgName, setCfgName] = useState('');
+  const [cfgRuntime, setCfgRuntime] = useState('nodejs');
+  const [cfgStartCmd, setCfgStartCmd] = useState('');
+  const [cfgInstallCmd, setCfgInstallCmd] = useState('');
+  const [cfgMaxRam, setCfgMaxRam] = useState(512);
+  const [cfgAutoRestart, setCfgAutoRestart] = useState(true);
+  const [cfgEnvVars, setCfgEnvVars] = useState('{}');
+  const [saveLoading, setSaveLoading] = useState(false);
+
   const loadApp = async () => {
     try {
       const data = await api(`/apps/${appId}`);
@@ -484,6 +495,47 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   useEffect(() => {
     loadApp();
   }, [appId, onRefreshTrigger]);
+
+  useEffect(() => {
+    if (app) {
+      setCfgName(app.name || '');
+      setCfgRuntime(app.runtime || 'nodejs');
+      setCfgStartCmd(app.start_cmd || '');
+      setCfgInstallCmd(app.install_cmd || '');
+      setCfgMaxRam(app.max_ram || 512);
+      setCfgAutoRestart(app.auto_restart === 1);
+      setCfgEnvVars(JSON.stringify(app.env_vars || {}, null, 2));
+    }
+  }, [app]);
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    let envObj = {};
+    try {
+      envObj = JSON.parse(cfgEnvVars);
+    } catch (_) {
+      alert('Invalid Environment Variables JSON syntax.');
+      return;
+    }
+    setSaveLoading(true);
+    try {
+      await api(`/apps/${appId}`, 'PATCH', {
+        name: cfgName,
+        runtime: cfgRuntime,
+        start_cmd: cfgStartCmd,
+        install_cmd: cfgInstallCmd,
+        max_ram: parseInt(cfgMaxRam),
+        auto_restart: cfgAutoRestart ? 1 : 0,
+        env_vars: envObj
+      });
+      alert('Configuration updated successfully!');
+      loadApp();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   // Connect socket for live status
   useEffect(() => {
@@ -790,7 +842,8 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
             { id: 'domains', label: '🌐 Domains & Proxy', icon: Globe },
             { id: 'backups', label: '🛡️ Backups & Restore', icon: ClipboardList }
           ] : []),
-          { id: 'crons', label: '📅 Cron Scheduler', icon: Calendar }
+          { id: 'crons', label: '📅 Cron Scheduler', icon: Calendar },
+          { id: 'settings', label: '⚙️ Server Settings', icon: SettingsIcon }
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -890,6 +943,118 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
         {/* Cron Scheduler Tab */}
         {activeTab === 'crons' && (
           <CronsTab appId={appId} />
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6 max-w-2xl page-fade-in">
+            <div>
+              <h3 className="font-bold text-text">Server Configuration Settings</h3>
+              <p className="text-xs text-muted mt-1">Modify application runtime options, RAM caps, and environmental configurations.</p>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Server Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={cfgName}
+                    onChange={e => setCfgName(e.target.value)}
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Memory Allocation (MB)</label>
+                  <input
+                    type="number"
+                    required
+                    value={cfgMaxRam}
+                    onChange={e => setCfgMaxRam(e.target.value)}
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Runtime Environment</label>
+                  <select
+                    value={cfgRuntime}
+                    onChange={e => setCfgRuntime(e.target.value)}
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                  >
+                    <option value="nodejs">Node.js</option>
+                    <option value="python">Python</option>
+                    <option value="java">Java (OpenJDK)</option>
+                    <option value="docker">Docker</option>
+                    <option value="bash">Shell/Bash</option>
+                    <option value="custom">Custom Command</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Startup Command</label>
+                  <input
+                    type="text"
+                    required
+                    value={cfgStartCmd}
+                    onChange={e => setCfgStartCmd(e.target.value)}
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Install Command (Optional)</label>
+                <input
+                  type="text"
+                  value={cfgInstallCmd}
+                  onChange={e => setCfgInstallCmd(e.target.value)}
+                  placeholder="e.g. npm install"
+                  className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Environment Variables (JSON)</label>
+                <textarea
+                  value={cfgEnvVars}
+                  onChange={e => setCfgEnvVars(e.target.value)}
+                  rows="5"
+                  className="w-full bg-bg border border-border focus:border-accent text-text font-mono rounded-xl p-3 outline-none transition-colors text-sm"
+                ></textarea>
+              </div>
+
+              <div className="flex items-center gap-2 py-2">
+                <input
+                  type="checkbox"
+                  id="cfg-auto-restart"
+                  checked={cfgAutoRestart}
+                  onChange={e => setCfgAutoRestart(e.target.checked)}
+                  className="rounded border-border text-accent focus:ring-accent w-4 h-4"
+                />
+                <label htmlFor="cfg-auto-restart" className="text-xs font-bold text-text2 uppercase tracking-wider cursor-pointer select-none">
+                  Enable Daemon Auto-Restart
+                </label>
+              </div>
+
+              {app.status === 'running' && (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 p-4 rounded-xl text-xs flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 flex-shrink-0" />
+                  <span>Warning: Stop the application process first before saving new configuration changes.</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={saveLoading || app.status === 'running'}
+                className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-sm px-5 py-3 rounded-xl shadow-lg shadow-accent/15 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saveLoading ? 'Saving...' : 'Save Configuration'}
+              </button>
+            </form>
+          </div>
         )}
       </div>
     </div>
