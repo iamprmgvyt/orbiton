@@ -312,8 +312,8 @@ while [ "$done" == false ]; do
     "Install Panel only (Central UI & User Database)"
     "Install Daemon only (Wings Agent on Node VPS)"
     "Configure Let's Encrypt SSL certificate"
-    "Update Orbiton to the Latest Version & Restart Services"
     "Uninstall Panel & Daemon"
+    "Update Orbiton to the Latest Version & Restart Services"
     "Cancel / Exit"
   )
 
@@ -354,11 +354,11 @@ while [ "$done" == false ]; do
       done=true
       ;;
     4)
-      update_orbiton
+      uninstall_orbiton
       done=true
       ;;
     5)
-      uninstall_orbiton
+      update_orbiton
       done=true
       ;;
     6)
