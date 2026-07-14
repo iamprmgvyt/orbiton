@@ -1,7 +1,7 @@
 import React from 'react';
-import { RefreshCw, Menu } from 'lucide-react';
+import { RefreshCw, Menu, Sun, Moon } from 'lucide-react';
 
-export default function Topbar({ activePage, onRefresh, onOpenSidebar }) {
+export default function Topbar({ activePage, onRefresh, onOpenSidebar, theme, setTheme }) {
   const TITLES = {
     dashboard: ['Dashboard', 'System overview and core statistics'],
     apps: ['Applications', 'Manage all your self-hosted services'],
@@ -34,6 +34,13 @@ export default function Topbar({ activePage, onRefresh, onOpenSidebar }) {
 
       {/* Action Buttons */}
       <div className="flex items-center gap-3">
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="p-2.5 rounded-xl border border-border text-text2 hover:bg-surface hover:text-text transition-colors flex items-center justify-center"
+          title="Toggle Light/Dark Theme"
+        >
+          {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
         <button
           onClick={onRefresh}
           className="p-2.5 rounded-xl border border-border text-text2 hover:bg-surface hover:text-text transition-colors flex items-center gap-2 text-sm font-medium"

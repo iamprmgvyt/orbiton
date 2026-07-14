@@ -19,6 +19,17 @@ export default function App() {
   const [activePage, setActivePage] = useState('dashboard');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('orbiton_theme') || 'dark');
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+    localStorage.setItem('orbiton_theme', theme);
+  }, [theme]);
 
   // AppDetail state
   const [selectedAppId, setSelectedAppId] = useState(null);
@@ -127,9 +138,11 @@ export default function App() {
           activePage={activePage}
           onRefresh={handleRefresh}
           onOpenSidebar={() => setIsSidebarOpen(true)}
+          theme={theme}
+          setTheme={setTheme}
         />
 
-        <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-6 max-w-7xl w-full mx-auto page-fade-in" key={activePage}>
           {activePage === 'dashboard' && (
             <Dashboard onOpenApp={handleOpenAppDetail} onRefreshTrigger={refreshTrigger} user={user} />
           )}

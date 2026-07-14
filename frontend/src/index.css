@@ -3,15 +3,69 @@
 @tailwind utilities;
 
 :root {
-  background-color: #060612;
-  color: #f1f5f9;
+  --bg: #060612;
+  --bg2: #0d0d1e;
+  --surface: rgba(255, 255, 255, 0.035);
+  --surface2: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.08);
+  --border2: rgba(255, 255, 255, 0.13);
+  --accent: #7c3aed;
+  --accent2: #3b82f6;
+  --accent3: #a855f7;
+  --text: #f1f5f9;
+  --text2: #cbd5e1;
+  --muted: #64748b;
+}
+
+:root.light {
+  --bg: #f8fafc;
+  --bg2: #ffffff;
+  --surface: rgba(15, 23, 42, 0.02);
+  --surface2: rgba(15, 23, 42, 0.04);
+  --border: rgba(15, 23, 42, 0.08);
+  --border2: rgba(15, 23, 42, 0.12);
+  --accent: #6d28d9;
+  --accent2: #2563eb;
+  --accent3: #7c3aed;
+  --text: #0f172a;
+  --text2: #334155;
+  --muted: #64748b;
+}
+
+* {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
 }
 
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   overflow-x: hidden;
+  background-color: var(--bg);
+  color: var(--text);
 }
+
+/* Route transitions */
+.page-fade-in {
+  animation: pageFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Glassmorphism card glow */
+.glow-card:hover {
+  box-shadow: 0 10px 30px -10px rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.3);
+}
+
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {

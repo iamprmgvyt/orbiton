@@ -1176,3 +1176,10 @@ body {
   border-color: var(--accent);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
 }
+
+.light-theme .aurora-glow-1 {
+  background: radial-gradient(circle, rgba(109, 40, 217, 0.03) 0%, transparent 70%);
+}
+.light-theme .aurora-glow-2 {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.02) 0%, transparent 70%);
+}
