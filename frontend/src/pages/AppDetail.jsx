@@ -603,11 +603,33 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     if (action === 'kill') {
       if (!confirm('Are you sure you want to FORCE KILL this process? This might cause data loss.')) return;
     }
+    
+    const socket = socketRef.current;
+    const isConsoleActive = activeTab === 'console' && socket;
+    
+    if (isConsoleActive) {
+      if (action === 'start') {
+        socket.emit('terminal:input', { input: app.start_cmd + '\r' });
+      } else if (action === 'stop') {
+        socket.emit('terminal:input', { input: '\x03' }); // Send Ctrl+C (SIGINT)
+      } else if (action === 'restart') {
+        socket.emit('terminal:input', { input: '\x03' }); // Send Ctrl+C
+        setTimeout(() => {
+          socket.emit('terminal:input', { input: app.start_cmd + '\r' });
+        }, 1000);
+      }
+    }
+
     try {
       await api(`/apps/${appId}/${action}`, 'POST');
-      loadApp();
+      setTimeout(loadApp, 1000);
     } catch (err) {
-      alert(err.message);
+      if (!isConsoleActive) {
+        alert(err.message);
+      } else {
+        // Reload app status regardless of minor socket timeout API errors
+        setTimeout(loadApp, 1000);
+      }
     }
   };
 
