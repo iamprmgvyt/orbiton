@@ -329,6 +329,8 @@ app.post('/api/domains/unbind', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Proxy unbinding failed: ' + err.message });
   }
+});
+
 // ─── System Metrics History (In-memory 24H log) ───────────────
 const systemMetricsHistory = [];
 const initMetricsHistory = () => {
