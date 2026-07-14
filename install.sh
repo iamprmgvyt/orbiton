@@ -47,25 +47,53 @@ EOF
 }
 
 
+setup_swap() {
+  local swap_total=$(free -m | awk '/^Swap:/{print $2}')
+  if [ -z "$swap_total" ]; then
+    swap_total=0
+  fi
+  
+  local ram_total=$(free -m | awk '/^Mem:/{print $2}')
+  if [ -z "$ram_total" ]; then
+    ram_total=4096
+  fi
+  
+  if [ "$ram_total" -lt 4000 ] && [ "$swap_total" -eq 0 ]; then
+    echo -e "${YELLOW}Low physical memory detected ($ram_total MB RAM) and no Swap space configured.${NC}"
+    echo -e "${YELLOW}Creating a 2GB Swap file to prevent installation bottlenecks and out-of-memory crashes...${NC}"
+    
+    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 >> $LOG_PATH 2>&1
+    chmod 600 /swapfile
+    mkswap /swapfile >> $LOG_PATH 2>&1
+    swapon /swapfile >> $LOG_PATH 2>&1
+    
+    if ! grep -q "/swapfile" /etc/fstab; then
+      echo "/swapfile none swap sw 0 0" >> /etc/fstab
+    fi
+    echo -e "${GREEN}✔ 2GB Swap Space successfully created and activated!${NC}"
+  fi
+}
+
 safe_apt_install() {
   for pkg in "$@"; do
     if apt-cache show "$pkg" &>/dev/null 2>&1; then
-      apt-get install -y -qq "$pkg" >> $LOG_PATH 2>&1 || echo -e "${YELLOW}  ⚠ Skipping ${pkg}${NC}"
+      apt-get install -y "$pkg" || echo -e "${YELLOW}  ⚠ Skipping ${pkg}${NC}"
     fi
   done
 }
 
 update_system() {
+  setup_swap
   echo -e "${YELLOW}Updating package repository...${NC}"
   apt-get update -qq >> $LOG_PATH 2>&1
-  apt-get install -y -qq curl wget git build-essential unzip ca-certificates gnupg lsb-release >> $LOG_PATH 2>&1
+  apt-get install -y curl wget git build-essential unzip ca-certificates gnupg lsb-release
 }
 
 install_node() {
   if ! command -v node &>/dev/null; then
     echo -e "${YELLOW}Installing Node.js LTS...${NC}"
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >> $LOG_PATH 2>&1
-    apt-get install -y -qq nodejs >> $LOG_PATH 2>&1
+    apt-get install -y nodejs
   fi
   echo -e "${GREEN}✔ Node.js $(node --version) installed${NC}"
 }
@@ -78,7 +106,7 @@ install_docker() {
     chmod a+r /etc/apt/keyrings/docker.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
     apt-get update -qq >> $LOG_PATH 2>&1
-    apt-get install -y -qq docker-ce docker-ce-cli containerd.io >> $LOG_PATH 2>&1
+    apt-get install -y docker-ce docker-ce-cli containerd.io
     systemctl enable docker --quiet 2>/dev/null || true
     systemctl start docker 2>/dev/null || true
   fi
