@@ -12,7 +12,9 @@ import {
   Terminal,
   Activity,
   FolderOpen,
-  Settings
+  Settings,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 const GithubIcon = (props) => (
@@ -182,6 +184,35 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
+  const [theme, setTheme] = useState(localStorage.getItem('orbiton_docs_theme') || 'dark');
+  const [scrollProgress, setScrollProgress] = useState(0);
+
+  useEffect(() => {
+    localStorage.setItem('orbiton_docs_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const contentEl = document.querySelector('.docs-content');
+      if (!contentEl) return;
+      const total = contentEl.scrollHeight - contentEl.clientHeight;
+      if (total <= 0) {
+        setScrollProgress(0);
+        return;
+      }
+      const progress = (contentEl.scrollTop / total) * 100;
+      setScrollProgress(progress);
+    };
+
+    const contentEl = document.querySelector('.docs-content');
+    if (contentEl) {
+      contentEl.addEventListener('scroll', handleScroll);
+      handleScroll();
+    }
+    return () => {
+      if (contentEl) contentEl.removeEventListener('scroll', handleScroll);
+    };
+  }, [activeSectionId]);
 
   const activeSection = DOCS_SECTIONS.find(s => s.id === activeSectionId) || DOCS_SECTIONS[0];
 
@@ -333,7 +364,9 @@ export default function App() {
   );
 
   return (
-    <div className="docs-app">
+    <div className={`docs-app ${theme === 'light' ? 'light-theme' : ''}`}>
+      {/* Reading Progress Line */}
+      <div className="reading-progress-bar" style={{ width: `${scrollProgress}%` }}></div>
       
       {/* Aurora Neon Background Glows */}
       <div className="aurora-bg">
@@ -359,6 +392,13 @@ export default function App() {
         </div>
 
         <div className="header-actions">
+          <button 
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="btn-theme-toggle"
+            aria-label="Toggle light/dark theme"
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
           <a 
             href="https://github.com/iamprmgvyt/orbiton" 
             target="_blank" 

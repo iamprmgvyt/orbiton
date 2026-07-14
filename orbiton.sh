@@ -10,16 +10,21 @@ DAEMON_DIR="/opt/orbiton-daemon"
 
 show_help() {
   echo -e "${BLUE}${BOLD}🪐 Orbiton System CLI Manager${NC}"
-  echo -e "Usage: ${GREEN}orbiton <command>${NC}\n"
+  echo -e "Usage: ${GREEN}orbiton <command> [args]${NC}\n"
   echo -e "Commands:"
-  echo -e "  ${GREEN}start${NC}     : Start Orbiton Panel and Daemon Node services"
-  echo -e "  ${GREEN}stop${NC}      : Stop Orbiton Panel and Daemon Node services"
-  echo -e "  ${GREEN}restart${NC}   : Restart both Orbiton Panel and Daemon Node"
-  echo -e "  ${GREEN}status${NC}    : Show systemd status for Orbiton services"
-  echo -e "  ${GREEN}logs${NC}      : View real-time systemd service output logs"
-  echo -e "  ${GREEN}update${NC}    : Pull the latest updates from GitHub and reload services"
-  echo -e "  ${GREEN}version${NC}   : Show installed version info"
-  echo -e "  ${GREEN}help${NC}      : Display this options helper menu"
+  echo -e "  ${GREEN}start${NC}                   : Start Orbiton Panel and Daemon Node services"
+  echo -e "  ${GREEN}stop${NC}                    : Stop Orbiton Panel and Daemon Node services"
+  echo -e "  ${GREEN}restart${NC}                 : Restart both Orbiton Panel and Daemon Node"
+  echo -e "  ${GREEN}status${NC}                  : Show systemd status for Orbiton services"
+  echo -e "  ${GREEN}logs${NC}                    : View real-time systemd service output logs"
+  echo -e "  ${GREEN}update${NC}                  : Pull the latest updates from GitHub and reload services"
+  echo -e "  ${GREEN}apps${NC}                    : List all applications configured on the panel"
+  echo -e "  ${GREEN}sysinfo${NC}                 : Display real-time VPS diagnostics (CPU/RAM/Uptime)"
+  echo -e "  ${GREEN}ports${NC}                   : List all listening network ports on the system"
+  echo -e "  ${GREEN}create-admin <u > <p >${NC}  : Create a new Web Panel admin account"
+  echo -e "  ${GREEN}reset-password <u > <p >${NC}: Reset password for a panel user account"
+  echo -e "  ${GREEN}version${NC}                 : Show installed version info"
+  echo -e "  ${GREEN}help${NC}                    : Display this options helper menu"
   echo -e "\nCreated by ${YELLOW}iamprmgvyt${NC}"
 }
 
@@ -84,8 +89,54 @@ case "$1" in
       echo -e "${GREEN}✔ Orbiton manually updated successfully.${NC}"
     fi
     ;;
+  apps)
+    if [ -d "$PANEL_DIR" ]; then
+      cd "$PANEL_DIR" && node scripts/list-apps.js
+    else
+      echo -e "${RED}❌ Web Panel is not installed on this VPS.${NC}"
+    fi
+    ;;
+  sysinfo)
+    if [ -d "$PANEL_DIR" ]; then
+      cd "$PANEL_DIR" && node scripts/sysinfo.js
+    else
+      echo -e "${RED}❌ Web Panel is not installed on this VPS.${NC}"
+    fi
+    ;;
+  ports)
+    echo -e "${BLUE}${BOLD}Listening Network Ports:${NC}"
+    if command -v ss &>/dev/null; then
+      ss -tulpn | grep LISTEN
+    elif command -v netstat &>/dev/null; then
+      netstat -plnt
+    else
+      echo -e "${RED}Neither 'ss' nor 'netstat' command found.${NC}"
+    fi
+    ;;
+  create-admin)
+    if [ -z "$2" ] || [ -z "$3" ]; then
+      echo -e "${RED}❌ Usage: sudo orbiton create-admin <username> <password>${NC}"
+      exit 1
+    fi
+    if [ -d "$PANEL_DIR" ]; then
+      cd "$PANEL_DIR" && node scripts/create-admin.js "$2" "$3"
+    else
+      echo -e "${RED}❌ Web Panel is not installed on this VPS.${NC}"
+    fi
+    ;;
+  reset-password)
+    if [ -z "$2" ] || [ -z "$3" ]; then
+      echo -e "${RED}❌ Usage: sudo orbiton reset-password <username> <new_password>${NC}"
+      exit 1
+    fi
+    if [ -d "$PANEL_DIR" ]; then
+      cd "$PANEL_DIR" && node scripts/reset-password.js "$2" "$3"
+    else
+      echo -e "${RED}❌ Web Panel is not installed on this VPS.${NC}"
+    fi
+    ;;
   version)
-    echo -e "Orbiton Orchestrator v1.0.0"
+    echo -e "Orbiton Orchestrator v1.13.1"
     ;;
   *)
     show_help

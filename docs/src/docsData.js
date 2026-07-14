@@ -162,6 +162,68 @@ node server.js
     `
   },
   {
+    id: 'cli-commands',
+    category: 'Getting Started',
+    title: 'Orbiton Global CLI Tool',
+    content: `
+# Orbiton Global CLI Tool
+
+Orbiton features an elegant, zero-configuration Command Line Interface (CLI) directly registered to your system shell. This allows you to manage services, system diagnostics, and user credentials with high performance and zero complexity.
+
+---
+
+### Command Guide
+
+#### 🚀 1. Service Life-Cycle
+Manage target systemd daemons and Panel process states:
+\`\`\`bash
+# Start Panel and Daemon Node services
+sudo orbiton start
+
+# Stop all Orbiton services
+sudo orbiton stop
+
+# Restart Panel and Daemon (equivalent to complex service reload scripts)
+sudo orbiton restart
+\`\`\`
+
+#### 🛡️ 2. User & Access Administration
+Quickly generate new roles or reset security passwords from the terminal shell:
+\`\`\`bash
+# Create a new administrator account
+sudo orbiton create-admin <username> <password>
+
+# Reset password for any panel user account
+sudo orbiton reset-password <username> <new_password>
+\`\`\`
+
+#### 📊 3. Telemetry & Auditing
+Retrieve real-time telemetry metrics and listing states:
+\`\`\`bash
+# List all hosted applications and their running statuses
+sudo orbiton apps
+
+# Display a beautiful, live diagnostics board of CPU/RAM/Uptime
+sudo orbiton sysinfo
+
+# List all listening network ports on the system
+sudo orbiton ports
+
+# Stream systemd journal logs in real-time (Ctrl+C to exit)
+sudo orbiton logs
+\`\`\`
+
+#### 🔄 4. Version & Self-Update
+\`\`\`bash
+# Trigger an automated update pulling code from GitHub and restarting services
+sudo orbiton update
+
+# View installed CLI version info
+sudo orbiton version
+\`\`\`
+`
+  },
+  {
     id: 'api-telemetry',
     category: 'API Reference',
     title: 'GET /api/system/stats',
