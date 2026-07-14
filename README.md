@@ -88,7 +88,8 @@ sudo bash install.sh
 * **`[1]` Web Panel:** Installs only the Master UI and database.
 * **`[2]` Daemon Node:** Installs only the Wings daemon on target worker servers.
 * **`[3]` Configure Let's Encrypt:** Set up HTTPS SSL configuration for your panel domain.
-* **`[4]` Uninstall:** Purges Orbiton and all system d daemons.
+* **`[4]` Update Orbiton:** Pulls the latest version from GitHub, rebuilds dependencies, and restarts services.
+* **`[5]` Uninstall:** Purges Orbiton and all systemd daemons.
 
 ---
 
