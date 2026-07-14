@@ -52,7 +52,8 @@ export default function App() {
       const path = window.location.pathname;
       const m = path.match(/^\/server\/([^/]+)(?:\/(console|files|logs|info))?$/);
       if (m) {
-        const [, appId, tab] = m;
+        let [, appId, tab] = m;
+        if (tab === 'logs') tab = 'console';
         setSelectedAppId(appId);
         setInitialDetailTab(tab || 'console');
         setActivePage('app-detail');
@@ -85,11 +86,11 @@ export default function App() {
     history.pushState({ page: pageId }, '', `/${pageId}`);
   };
 
-  const handleOpenAppDetail = (appId, tab = 'logs') => {
+  const handleOpenAppDetail = (appId, tab = 'console') => {
     setSelectedAppId(appId);
-    setInitialDetailTab(tab);
+    setInitialDetailTab(tab === 'logs' ? 'console' : tab);
     setActivePage('app-detail');
-    history.pushState({ page: 'server', appId, tab }, '', `/server/${appId}/${tab}`);
+    history.pushState({ page: 'server', appId, tab: tab === 'logs' ? 'console' : tab }, '', `/server/${appId}/${tab === 'logs' ? 'console' : tab}`);
   };
 
   const handleBackToApps = () => {
