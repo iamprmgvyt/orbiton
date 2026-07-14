@@ -987,7 +987,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                   <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Runtime Environment</label>
                   <select
                     value={cfgRuntime}
-                    disabled={!isAdmin}
+                    disabled={true}
                     onChange={e => setCfgRuntime(e.target.value)}
                     className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >

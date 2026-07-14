@@ -282,15 +282,19 @@ router.patch('/:id', async (req, res) => {
   if (statusInfo.status === 'running')
     return res.status(409).json({ error: 'Stop the application first before editing' });
 
+  // Runtime environment is immutable after server creation
+  if (runtime !== undefined && runtime !== app.runtime) {
+    return res.status(400).json({ error: 'Runtime environment (Server Type) cannot be modified after server creation. Please delete and recreate the server instead.' });
+  }
+
   // Security Check: Role enforcement for non-admin users
   if (req.user.role !== 'admin') {
     if (
       (name !== undefined && name !== app.name) ||
-      (runtime !== undefined && runtime !== app.runtime) ||
       (max_ram !== undefined && parseInt(max_ram) !== app.max_ram) ||
       (auto_restart !== undefined && (auto_restart ? 1 : 0) !== app.auto_restart)
     ) {
-      return res.status(403).json({ error: 'Forbidden: Only administrators can modify server name, runtime environment, RAM allocation, or auto-restart settings.' });
+      return res.status(403).json({ error: 'Forbidden: Only administrators can modify server name, RAM allocation, or auto-restart settings.' });
     }
   }
 
@@ -298,7 +302,6 @@ router.patch('/:id', async (req, res) => {
     UPDATE apps SET
       name         = COALESCE(?, name),
       description  = COALESCE(?, description),
-      runtime      = COALESCE(?, runtime),
       start_cmd    = COALESCE(?, start_cmd),
       install_cmd  = COALESCE(?, install_cmd),
       env_vars     = COALESCE(?, env_vars),
@@ -308,7 +311,6 @@ router.patch('/:id', async (req, res) => {
   `).run(
     name || null,
     description !== undefined ? description : null,
-    runtime || null,
     start_cmd || null,
     install_cmd !== undefined ? install_cmd : null,
     env_vars ? JSON.stringify(env_vars) : null,

@@ -60,7 +60,10 @@ function startApp(appId, appConfig) {
     APP_NAME: appConfig.name,
   };
 
-  const installCmd = appConfig.install_cmd ? appConfig.install_cmd.trim() : '';
+  let installCmd = appConfig.install_cmd ? appConfig.install_cmd.trim() : '';
+  if (installCmd && installCmd.includes('pip ') && !installCmd.includes('--break-system-packages')) {
+    installCmd += ' --break-system-packages';
+  }
   const startCmd = appConfig.start_cmd.trim();
 
   // If there is an install command, run it first!
