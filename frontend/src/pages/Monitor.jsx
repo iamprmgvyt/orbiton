@@ -36,7 +36,7 @@ export default function Monitor({ onRefreshTrigger }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    const socket = io({ auth: { token } });
+    const socket = io({ auth: { token }, transports: ['websocket'] });
 
     // Join metrics room for Node 1
     socket.emit('metrics:subscribe', { nodeId: 1 });

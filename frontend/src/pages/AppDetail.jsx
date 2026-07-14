@@ -490,7 +490,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     if (!app) return;
 
     const token = localStorage.getItem('token');
-    const socket = io({ auth: { token } });
+    const socket = io({ auth: { token }, transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.emit('app:subscribe', { appId });

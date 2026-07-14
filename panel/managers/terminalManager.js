@@ -38,7 +38,8 @@ function setupSocketHandlers(ioServer) {
       // Connect to Daemon node
       daemonSocket = io(targetUrl, {
         auth: { token: targetToken },
-        reconnection: false
+        reconnection: false,
+        transports: ['websocket']
       });
 
       daemonSocket.on('connect', () => {
