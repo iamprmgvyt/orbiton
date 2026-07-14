@@ -8,7 +8,11 @@ import {
   Check, 
   Search, 
   ChevronRight, 
-  Cpu 
+  Cpu,
+  Terminal,
+  Activity,
+  FolderOpen,
+  Settings
 } from 'lucide-react';
 
 const GithubIcon = (props) => (
@@ -25,8 +29,17 @@ function FeedbackForm() {
   const [submitted, setSubmitted] = useState(false);
   const [allFeedbacks, setAllFeedbacks] = useState([]);
 
+  const PANEL_API_URL = import.meta.env.VITE_PANEL_API_URL || '';
+
   const loadFeedbacks = async () => {
     try {
+      if (PANEL_API_URL) {
+        const res = await fetch(`${PANEL_API_URL}/feedbacks`);
+        if (!res.ok) throw new Error('Failed to fetch from Panel API');
+        const data = await res.json();
+        setAllFeedbacks(data || []);
+        return;
+      }
       const { data, error } = await supabase
         .from('feedbacks')
         .select('*')
@@ -272,6 +285,32 @@ export default function App() {
     return elements;
   };
 
+  // Automated simple syntax highlighting for code blocks
+  const highlightCode = (code) => {
+    if (!code) return '';
+    let html = code
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // Match comments
+    html = html.replace(/(\/\/.*|#.*)/g, '<span class="hl-comment">$1</span>');
+
+    // Match JSON keys & string values
+    html = html.replace(/(".*?")/g, '<span class="hl-string">$1</span>');
+
+    // Match numbers
+    html = html.replace(/\b(\d+)\b/g, '<span class="hl-number">$1</span>');
+
+    // Match HTTP Methods
+    html = html.replace(/\b(POST|GET|PUT|DELETE)\b/g, '<span class="hl-method">$1</span>');
+
+    // Match Bash / CLI commands
+    html = html.replace(/\b(sudo|bash|curl|chmod|node|npm|git|install|mkdir|cd|rm)\b/g, '<span class="hl-keyword">$1</span>');
+
+    return html;
+  };
+
   const renderInlineText = (text) => {
     const html = text
       .replace(/&/g, '&amp;')
@@ -427,7 +466,7 @@ export default function App() {
                     </button>
                   </div>
                   <pre className="code-block-pre">
-                    <code>{el.content}</code>
+                    <code dangerouslySetInnerHTML={{ __html: highlightCode(el.content) }} />
                   </pre>
                 </div>
               );
@@ -435,6 +474,43 @@ export default function App() {
             // Paragraph
             return <p key={i}>{renderInlineText(el.text)}</p>;
           })}
+
+          {/* Interactive Feature Grid - Only for Introduction section */}
+          {activeSectionId === 'intro' && (
+            <div className="features-grid">
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <Terminal size={18} />
+                </div>
+                <h5 className="feature-title">App Orchestrator</h5>
+                <p className="feature-desc">Control compile processes (Start, Stop, Restart) and manage application dependencies dynamically.</p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <Cpu size={18} />
+                </div>
+                <h5 className="feature-title">Multi-Node Cluster</h5>
+                <p className="feature-desc">Decoupled systemd Wings equivalent agents connecting hundreds of remote host nodes securely.</p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <FolderOpen size={18} />
+                </div>
+                <h5 className="feature-title">Embedded File Manager</h5>
+                <p className="feature-desc">Integrated web explorer to edit code, manage files, zip/unzip projects directly from the browser.</p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon-wrapper">
+                  <Settings size={18} />
+                </div>
+                <h5 className="feature-title">Runtime Shop</h5>
+                <p className="feature-desc">1-Click installation or uninstalling of Node, Python, Java, Docker, Rust, and compiler binaries.</p>
+              </div>
+            </div>
+          )}
           
           {activeSectionId === 'feedback' && <FeedbackForm />}
         </main>
