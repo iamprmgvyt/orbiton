@@ -843,16 +843,17 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
       {/* Tabs */}
       <div className="flex border-b border-border gap-2 pb-px overflow-x-auto">
         {[
-          ...(canConsole ? [{ id: 'console', label: '⌨️ Server Console', icon: TerminalIcon }] : []),
-          { id: 'info', label: 'ℹ️ Server Info', icon: Info },
+          ...(canConsole ? [{ id: 'console', label: 'Server Console', icon: TerminalIcon }] : []),
+          { id: 'info', label: 'Server Info', icon: Info },
           ...(canFiles ? [
-            { id: 'domains', label: '🌐 Domains & Proxy', icon: Globe },
-            { id: 'backups', label: '🛡️ Backups & Restore', icon: ClipboardList }
+            { id: 'domains', label: 'Domains & Proxy', icon: Globe },
+            { id: 'backups', label: 'Backups & Restore', icon: ClipboardList }
           ] : []),
-          { id: 'crons', label: '📅 Cron Scheduler', icon: Calendar },
-          { id: 'settings', label: '⚙️ Server Settings', icon: SettingsIcon }
+          { id: 'crons', label: 'Cron Scheduler', icon: Calendar },
+          { id: 'settings', label: 'Server Settings', icon: SettingsIcon }
         ].map(tab => {
           const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
@@ -860,14 +861,16 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                 setActiveTab(tab.id);
                 if (onTabChange) onTabChange(tab.id);
               }}
-              className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
-                activeTab === tab.id
+              className={`px-4 py-3 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2.5 group ${
+                isActive
                   ? 'border-accent text-accent bg-accent/5'
-                  : 'border-transparent text-muted hover:text-text'
+                  : 'border-transparent text-muted hover:text-text hover:bg-surface2/40'
               }`}
             >
-              <Icon className="w-4 h-4" />
-              {tab.label}
+              <Icon className={`w-[17px] h-[17px] transition-colors ${
+                isActive ? 'text-accent' : 'text-muted group-hover:text-text2'
+              }`} />
+              <span>{tab.label}</span>
             </button>
           );
         })}
