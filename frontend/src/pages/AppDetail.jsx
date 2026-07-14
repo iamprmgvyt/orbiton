@@ -467,6 +467,9 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   const xtermInstance = useRef(null);
   const fitAddonInstance = useRef(null);
   const socketRef = useRef(null);
+  
+  const sessionUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isAdmin = sessionUser.role === 'admin';
 
   // Settings Form States
   const [cfgName, setCfgName] = useState('');
@@ -960,9 +963,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                   <input
                     type="text"
                     required
+                    disabled={!isAdmin}
                     value={cfgName}
                     onChange={e => setCfgName(e.target.value)}
-                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -970,9 +974,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                   <input
                     type="number"
                     required
+                    disabled={!isAdmin}
                     value={cfgMaxRam}
                     onChange={e => setCfgMaxRam(e.target.value)}
-                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
@@ -982,8 +987,9 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                   <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Runtime Environment</label>
                   <select
                     value={cfgRuntime}
+                    disabled={!isAdmin}
                     onChange={e => setCfgRuntime(e.target.value)}
-                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+                    className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="nodejs">Node.js</option>
                     <option value="python">Python</option>
@@ -1030,9 +1036,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                 <input
                   type="checkbox"
                   id="cfg-auto-restart"
+                  disabled={!isAdmin}
                   checked={cfgAutoRestart}
                   onChange={e => setCfgAutoRestart(e.target.checked)}
-                  className="rounded border-border text-accent focus:ring-accent w-4 h-4"
+                  className="rounded border-border text-accent focus:ring-accent w-4 h-4 disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <label htmlFor="cfg-auto-restart" className="text-xs font-bold text-text2 uppercase tracking-wider cursor-pointer select-none">
                   Enable Daemon Auto-Restart
