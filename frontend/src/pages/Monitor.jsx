@@ -84,6 +84,81 @@ export default function Monitor({ onRefreshTrigger }) {
     };
   }, [onRefreshTrigger]);
 
+  // ─── 24-Hour metrics history log logic ────────────────────────
+  const [historyData, setHistoryData] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const data = await api('/system/metrics-history');
+        setHistoryData(data || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+    fetchHistory();
+    const histInterval = setInterval(fetchHistory, 300000);
+    return () => clearInterval(histInterval);
+  }, []);
+
+  const historyLabels = historyData.map(item => {
+    const d = new Date(item.timestamp);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  });
+
+  const historyChartData = {
+    labels: historyLabels,
+    datasets: [
+      {
+        label: 'CPU Core Load (%)',
+        data: historyData.map(item => item.cpu),
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245, 158, 11, 0.02)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      },
+      {
+        label: 'Virtual RAM Load (%)',
+        data: historyData.map(item => item.ram),
+        borderColor: '#a855f7',
+        backgroundColor: 'rgba(168, 85, 247, 0.02)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }
+    ]
+  };
+
+  const historyChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        labels: { color: '#64748b', font: { size: 10, weight: 'bold' } }
+      },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { color: '#64748b', maxTicksLimit: 12 }
+      },
+      y: {
+        min: 0,
+        max: 100,
+        grid: { color: 'rgba(255, 255, 255, 0.03)' },
+        ticks: { color: '#64748b', callback: v => v + '%' }
+      }
+    },
+    elements: { point: { radius: 1, hoverRadius: 5 } }
+  };
+
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -169,6 +244,29 @@ export default function Monitor({ onRefreshTrigger }) {
           <div className="h-[200px] relative z-10">
             <Line data={ramChartData} options={chartOptions} />
           </div>
+        </div>
+      </div>
+
+      {/* 24-Hour Metric History Chart */}
+      <div className="bg-surface border border-border/80 rounded-2xl p-6 shadow-xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-36 h-36 bg-accent/5 rounded-full blur-3xl opacity-30"></div>
+        <div className="flex items-center justify-between mb-4 relative z-10">
+          <div>
+            <h4 className="font-bold text-text">24-Hour System Analytics</h4>
+            <p className="text-xs text-muted mt-1">Historical CPU and RAM utilization logs (5-min intervals)</p>
+          </div>
+          <span className="text-[10px] bg-accent/10 border border-accent/20 text-accent font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider relative z-10">
+            24h History
+          </span>
+        </div>
+        <div className="h-[260px] relative z-10">
+          {loadingHistory ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-8 h-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <Line data={historyChartData} options={historyChartOptions} />
+          )}
         </div>
       </div>
 

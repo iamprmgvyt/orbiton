@@ -8,7 +8,8 @@ import {
   Globe, 
   RefreshCw, 
   Palette, 
-  Check 
+  Check,
+  ClipboardList 
 } from 'lucide-react';
 
 export default function Settings({ theme, setTheme }) {
@@ -27,6 +28,10 @@ export default function Settings({ theme, setTheme }) {
   const [newPort, setNewPort] = useState('');
   const [newProtocol, setNewProtocol] = useState('tcp');
   const [fwActionLoading, setFwActionLoading] = useState(false);
+
+  // Audit Logs states
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(true);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isAdmin = user.role === 'admin';
@@ -54,8 +59,22 @@ export default function Settings({ theme, setTheme }) {
     }
   };
 
+  const loadAuditLogs = async () => {
+    if (!isAdmin) return;
+    setAuditLoading(true);
+    try {
+      const data = await api('/system/audit-logs');
+      setAuditLogs(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'firewall') loadFirewall();
+    if (activeTab === 'audit') loadAuditLogs();
   }, [activeTab]);
 
   const handlePasswordSubmit = async (e) => {
@@ -113,6 +132,15 @@ export default function Settings({ theme, setTheme }) {
     }
   };
 
+  const getActionColor = (action) => {
+    const act = action.toLowerCase();
+    if (act.includes('start')) return 'bg-green-500/10 border-green-500/20 text-green-400';
+    if (act.includes('stop') || act.includes('kill')) return 'bg-red-500/10 border-red-500/20 text-red-400';
+    if (act.includes('create') || act.includes('deploy')) return 'bg-purple-500/10 border-purple-500/20 text-purple-400';
+    if (act.includes('delete')) return 'bg-orange-500/10 border-orange-500/20 text-orange-400';
+    return 'bg-blue-500/10 border-blue-500/20 text-blue-400';
+  };
+
   return (
     <div className="space-y-6">
       {/* Navigation tabs */}
@@ -140,17 +168,30 @@ export default function Settings({ theme, setTheme }) {
           Appearance & Themes
         </button>
         {isAdmin && (
-          <button
-            onClick={() => setActiveTab('firewall')}
-            className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
-              activeTab === 'firewall'
-                ? 'border-accent text-accent bg-accent/5'
-                : 'border-transparent text-muted hover:text-text'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            Node Firewall (UFW)
-          </button>
+          <>
+            <button
+              onClick={() => setActiveTab('firewall')}
+              className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
+                activeTab === 'firewall'
+                  ? 'border-accent text-accent bg-accent/5'
+                  : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              Node Firewall (UFW)
+            </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
+                activeTab === 'audit'
+                  ? 'border-accent text-accent bg-accent/5'
+                  : 'border-transparent text-muted hover:text-text'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              Activity Logs
+            </button>
+          </>
         )}
       </div>
 
@@ -391,6 +432,73 @@ export default function Settings({ theme, setTheme }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Audit Logs tab */}
+      {activeTab === 'audit' && isAdmin && (
+        <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="font-bold text-text">Global Activity Logs</h3>
+              <p className="text-xs text-muted mt-1">Audit log tracking administrative actions and API access events on this Node host.</p>
+            </div>
+            <button
+              onClick={loadAuditLogs}
+              className="p-2 hover:bg-surface2 rounded-xl text-muted hover:text-text transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </div>
+
+          {auditLoading ? (
+            <div className="flex items-center justify-center py-24">
+              <div className="w-8 h-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div className="text-center py-20 border border-dashed border-border rounded-xl">
+              <span className="text-4xl block mb-2">📋</span>
+              <h4 className="font-bold text-text">No logs found</h4>
+              <p className="text-xs text-muted mt-1 max-w-xs mx-auto">No administrative events have been recorded in the database yet.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-border text-muted text-[10px] uppercase font-bold tracking-wider">
+                    <th className="pb-3">Time</th>
+                    <th className="pb-3">User</th>
+                    <th className="pb-3">Action</th>
+                    <th className="pb-3">Target Application</th>
+                    <th className="pb-3 text-right">IP Address</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-surface2/30 transition-colors">
+                      <td className="py-4 text-xs font-semibold text-text2 font-mono">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </td>
+                      <td className="py-4 text-xs font-bold text-text">
+                        {log.username || 'System'}
+                      </td>
+                      <td className="py-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${getActionColor(log.action)}`}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="py-4 text-xs text-muted font-mono">
+                        {log.target || 'N/A'}
+                      </td>
+                      <td className="py-4 text-xs text-muted font-mono text-right">
+                        {log.ip || '127.0.0.1'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

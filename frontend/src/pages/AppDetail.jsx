@@ -17,7 +17,8 @@ import {
   ArrowLeft, 
   Globe, 
   Calendar, 
-  ShieldAlert 
+  ShieldAlert,
+  Download
 } from 'lucide-react';
 
 // ─── Backups Tab Component ─────────────────────────────────────
@@ -507,15 +508,28 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   }, [app?.id]);
 
   // Init Console Terminal & Load Log History
+  // Init Console Terminal & Load Log History
   useEffect(() => {
     if (activeTab !== 'console' || !app || !terminalRef.current) return;
     if (app.permissions && app.permissions.can_console === 0) return;
 
+    // Detect theme color settings
+    const currentTheme = localStorage.getItem('orbiton_theme') || 'theme-cyberpunk';
+    const themes = {
+      'theme-cyberpunk': { bg: '#060612', fg: '#f1f5f9', cursor: '#7c3aed' },
+      'theme-ocean': { bg: '#030a16', fg: '#e2e8f0', cursor: '#0d9488' },
+      'theme-emerald': { bg: '#02140e', fg: '#e6f4ea', cursor: '#10b981' },
+      'theme-sakura': { bg: '#150d12', fg: '#faeaf1', cursor: '#ec4899' },
+      'theme-nordic': { bg: '#ffffff', fg: '#0f172a', cursor: '#6d28d9' }
+    };
+    const tConfig = themes[currentTheme] || themes['theme-cyberpunk'];
+
     const term = new Xterm({
       theme: {
-        background: '#030307',
-        foreground: '#e2e8f0',
-        cursor: '#7c3aed'
+        background: tConfig.bg,
+        foreground: tConfig.fg,
+        cursor: tConfig.cursor,
+        cursorAccent: tConfig.bg
       },
       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
       fontSize: 13,
@@ -530,17 +544,26 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     xtermInstance.current = term;
     fitAddonInstance.current = fit;
 
+    // Smart Auto-scroll state
+    let isUserScrolling = false;
+    term.onScroll(() => {
+      const buffer = 4;
+      const isAtBottom = term.buffer.active.viewportY >= term.buffer.active.baseY - buffer;
+      isUserScrolling = !isAtBottom;
+    });
+
     const loadHistory = async () => {
       try {
         term.write('\x1b[36m[Orbiton] Loading logs history...\x1b[0m\r\n');
-        const logsData = await api(`/apps/${appId}/logs?lines=300`);
-        term.write('\x1bc');
-        if (logsData.logs && logsData.logs.length > 0) {
-          logsData.logs.forEach(line => {
-            term.write(line.replace(/\r?\n/g, '\r\n') + '\r\n');
+        // Fetch logs directly from Panel local DB history (works offline!)
+        const logsData = await api(`/apps/${appId}/logs-history`);
+        term.write('\x1bc'); // clear placeholder
+        if (logsData && logsData.length > 0) {
+          logsData.forEach(item => {
+            term.write(item.line.replace(/\r?\n/g, '\r\n') + '\r\n');
           });
         } else {
-          term.write('\x1b[33m[Orbiton] No console history found. Click "Start Daemon" to begin.\x1b[0m\r\n');
+          term.write('\x1b[33m[Orbiton] No console history found. Launch server daemon to start logs telemetry.\x1b[0m\r\n');
         }
       } catch (err) {
         term.write(`\x1b[31m[Orbiton Error] Failed to load history: ${err.message}\x1b[0m\r\n`);
@@ -551,7 +574,12 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
       const socket = socketRef.current;
       if (socket) {
         socket.emit('terminal:create', { appId, cols: term.cols, rows: term.rows });
-        socket.on('terminal:data', ({ data }) => term.write(data));
+        socket.on('terminal:data', ({ data }) => {
+          term.write(data);
+          if (!isUserScrolling) {
+            term.scrollToBottom();
+          }
+        });
         term.onData(data => {
           socket.emit('terminal:input', { input: data });
         });
@@ -583,15 +611,32 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     }
   };
 
-  const handleClearConsole = async () => {
+  const handleClearConsole = () => {
+    if (xtermInstance.current) {
+      xtermInstance.current.clear();
+      xtermInstance.current.write('\x1b[32m[Orbiton] Console screen cleared.\x1b[0m\r\n');
+    }
+  };
+
+  const handleDownloadLogs = async () => {
     try {
-      await api(`/apps/${appId}/logs/clear`, 'POST');
-      if (xtermInstance.current) {
-        xtermInstance.current.clear();
-        xtermInstance.current.write('\x1b[32m[Orbiton] Console logs cleared.\x1b[0m\r\n');
+      const logsData = await api(`/apps/${appId}/logs-history`);
+      if (!logsData || logsData.length === 0) {
+        alert('No logs available for download.');
+        return;
       }
+      const rawText = logsData.map(item => `${item.timestamp} | ${item.line}`).join('\n');
+      const blob = new Blob([rawText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `server-${appId}-console.log`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
-      alert(err.message);
+      alert('Failed to download logs: ' + err.message);
     }
   };
 
@@ -745,13 +790,23 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
           <div className="space-y-4 max-w-full">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted">Real-time server terminal and console history</span>
-              <button
-                onClick={handleClearConsole}
-                className="text-xs text-red-500 hover:text-red-400 font-semibold bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-500/10 transition-all flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                Clear Console
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadLogs}
+                  className="text-xs text-text2 hover:text-text font-semibold bg-surface2 hover:bg-border px-3 py-1.5 rounded-lg border border-border/80 transition-all flex items-center gap-1.5"
+                  title="Download raw console log history"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download Logs
+                </button>
+                <button
+                  onClick={handleClearConsole}
+                  className="text-xs text-red-500 hover:text-red-400 font-semibold bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg border border-red-500/10 transition-all flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Clear Console
+                </button>
+              </div>
             </div>
             <div className="w-full bg-[#030307] border border-border/80 rounded-xl overflow-hidden p-4">
               <div ref={terminalRef} className="h-[400px]"></div>

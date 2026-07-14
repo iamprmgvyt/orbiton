@@ -482,4 +482,24 @@ function getAuthorizedApp(req, res) {
   return null;
 }
 
+// GET /api/apps/:id/logs-history - Fetch historical console logs
+router.get('/:id/logs-history', (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    const logs = db.prepare(`
+      SELECT line, timestamp 
+      FROM app_logs 
+      WHERE app_id = ? 
+      ORDER BY id DESC 
+      LIMIT 100
+    `).all(app.id);
+    
+    // Reverse logs to show chronological order
+    res.json(logs.reverse());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

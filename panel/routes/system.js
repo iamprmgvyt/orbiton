@@ -15,6 +15,16 @@ router.use((req, res, next) => {
   next();
 });
 
+// GET /api/system/metrics-history
+router.get('/metrics-history', async (req, res) => {
+  try {
+    const data = await daemonRequest('/api/system/metrics-history');
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/system/stats
 router.get('/stats', async (req, res) => {
   try {
@@ -94,6 +104,23 @@ router.post('/runtimes/uninstall', async (req, res) => {
   try {
     const data = await daemonRequest('/api/system/runtimes/uninstall', 'POST', req.body);
     res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/system/audit-logs
+router.get('/audit-logs', (req, res) => {
+  try {
+    const { db } = require('../db/database');
+    const logs = db.prepare(`
+      SELECT a.*, u.username 
+      FROM audit_log a 
+      LEFT JOIN users u ON a.user_id = u.id 
+      ORDER BY a.id DESC 
+      LIMIT 150
+    `).all();
+    res.json(logs);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

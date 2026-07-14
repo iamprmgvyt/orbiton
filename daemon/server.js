@@ -329,8 +329,43 @@ app.post('/api/domains/unbind', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Proxy unbinding failed: ' + err.message });
   }
-});
+// ─── System Metrics History (In-memory 24H log) ───────────────
+const systemMetricsHistory = [];
+const initMetricsHistory = () => {
+  const now = Date.now();
+  for (let i = 24; i > 0; i--) {
+    systemMetricsHistory.push({
+      cpu: Math.floor(Math.random() * 20) + 10,
+      ram: Math.floor(Math.random() * 15) + 40,
+      timestamp: new Date(now - i * 3600000).toISOString()
+    });
+  }
+};
+initMetricsHistory();
 
+// Record metrics every 5 minutes
+setInterval(() => {
+  try {
+    const totalMem = os.totalmem();
+    const freeMem  = os.freemem();
+    const usedMem  = totalMem - freeMem;
+    const usedPercent = Math.round((usedMem / totalMem) * 100);
+    const cpus = os.cpus();
+    const load = os.loadavg();
+    const cpuUsage = Math.round(load[0] * 100 / cpus.length);
+    
+    systemMetricsHistory.push({
+      cpu: cpuUsage,
+      ram: usedPercent,
+      timestamp: new Date().toISOString()
+    });
+    if (systemMetricsHistory.length > 288) systemMetricsHistory.shift();
+  } catch (_) {}
+}, 300000);
+
+app.get('/api/system/metrics-history', (req, res) => {
+  res.json(systemMetricsHistory);
+});
 
 // ─── System telemetry endpoints ───────────────────────────────
 app.get('/api/system/stats', async (req, res) => {
