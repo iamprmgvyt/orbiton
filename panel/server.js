@@ -58,6 +58,8 @@ app.use('/api/system', authMiddleware, systemRoutes);
 app.use('/api/nodes',  authMiddleware, require('./routes/nodes'));
 app.use('/api/permissions', authMiddleware, require('./routes/permissions'));
 app.use('/api/backups',     authMiddleware, require('./routes/backups'));
+app.use('/api/domains',     authMiddleware, require('./routes/domains'));
+app.use('/api/crons',       authMiddleware, require('./routes/crons'));
 
 // Catch-all → serve React frontend SPA index.html
 app.get('*', (req, res) => {
@@ -66,6 +68,10 @@ app.get('*', (req, res) => {
 
 // ─── Init DB ──────────────────────────────────────────────────
 initDatabase();
+
+// Init Cron Scheduler
+const { initCronScheduler } = require('./managers/cronManager');
+initCronScheduler();
 
 // ─── Server Startup ───────────────────────────────────────────
 const httpServer = http.createServer(app);

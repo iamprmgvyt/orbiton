@@ -88,6 +88,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
       java: 'java -jar server.jar',
       golang: 'go run main.go',
       rust: 'cargo run',
+      'docker-compose': 'docker compose up',
       custom: 'echo "Hello Orbiton"'
     };
     const installDefaults = {
@@ -96,6 +97,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
       java: '',
       golang: '',
       rust: '',
+      'docker-compose': '',
       custom: ''
     };
     setStartCmd(defaults[val] || 'node index.js');
@@ -214,6 +216,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
       python3: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg',
       java: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg',
       docker: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
+      'docker-compose': 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg',
       golang: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg',
       rust: 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg'
     };
@@ -472,6 +475,7 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user }) {
                           <option value="java">Java (OpenJDK)</option>
                           <option value="golang">Golang</option>
                           <option value="rust">Rust</option>
+                          <option value="docker-compose">Docker Compose</option>
                           <option value="custom">Custom Command</option>
                         </select>
                       </div>

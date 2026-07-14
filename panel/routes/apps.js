@@ -38,9 +38,20 @@ const RUNTIMES = {
   php:     { label: 'PHP',       icon: '🐘', color: '#7b1fa2', desc: 'PHP, Laravel, Composer' },
   ruby:    { label: 'Ruby',      icon: '💎', color: '#c62828', desc: 'Ruby, Rails, Gem' },
   custom:  { label: 'Custom',    icon: '⚙️', color: '#37474f', desc: 'Any custom command' },
+  'docker-compose': { label: 'Docker Compose', icon: '🐳', color: '#0288d1', desc: 'docker-compose.yml projects' }
 };
 
 const TEMPLATES = {
+  docker_compose: {
+    name: 'Docker Compose Project',
+    runtime: 'docker-compose',
+    start_cmd: 'docker compose up',
+    install_cmd: '',
+    description: 'Deploy multi-container services with docker-compose.yml config file',
+    icon: '🐳',
+    env_hint: '{}',
+    readme: 'Place your docker-compose.yml file in the workspace directory. Orbiton will execute docker compose up -d to manage the stack.'
+  },
   nodejs_generic: {
     name: 'Node.js Generic (Ptero-style)',
     runtime: 'nodejs',

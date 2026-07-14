@@ -218,6 +218,120 @@ app.delete('/api/apps/:appId/backup/:backupName', (req, res) => {
 });
 
 
+app.post('/api/apps/:appId/execute', (req, res) => {
+  const { appId } = req.params;
+  const { command } = req.body;
+  if (!command) return res.status(400).json({ error: 'command is required.' });
+
+  const DATA_DIR = process.env.DATA_DIR || (process.platform === 'win32' ? path.join(process.env.APPDATA || os.homedir(), 'orbiton-data') : '/opt/orbiton-data');
+  const appDir = path.join(DATA_DIR, 'apps', appId);
+
+  try {
+    if (!fs.existsSync(appDir)) return res.status(404).json({ error: 'App workspace directory not found.' });
+
+    const { exec } = require('child_process');
+    exec(command, { cwd: appDir }, (err, stdout, stderr) => {
+      if (err) {
+        console.error(`[Daemon Command Exec Error] App: ${appId}, Cmd: ${command}, Error: ${err.message}`);
+        return;
+      }
+      console.log(`[Daemon Command Exec Success] App: ${appId}, Cmd: ${command}`);
+    });
+
+    res.json({ success: true, message: 'Command execution dispatched.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ─── Daemon Nginx Reverse Proxy & SSL API ─────────────────────
+app.post('/api/domains/bind', async (req, res) => {
+  const { domain, port, sslEnabled } = req.body;
+  if (!domain || !port) {
+    return res.status(400).json({ error: 'domain and port are required.' });
+  }
+
+  const isLinux = process.platform === 'linux';
+  const vhostPath = isLinux ? `/etc/nginx/sites-available/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-${domain}`);
+  const symlinkPath = isLinux ? `/etc/nginx/sites-enabled/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-enabled-${domain}`);
+
+  const configContent = `server {
+    listen 80;
+    server_name ${domain};
+
+    location / {
+        proxy_pass http://127.0.0.1:${port};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+`;
+
+  try {
+    // Write configuration file
+    fs.writeFileSync(vhostPath, configContent, 'utf8');
+
+    if (isLinux) {
+      // Create symlink if not exists
+      if (!fs.existsSync(symlinkPath)) {
+        fs.symlinkSync(vhostPath, symlinkPath);
+      }
+
+      // Reload Nginx to apply Changes
+      const { execSync } = require('child_process');
+      try {
+        execSync('nginx -t', { stdio: 'ignore' });
+        execSync('systemctl reload nginx', { stdio: 'ignore' });
+      } catch (nginxErr) {
+        console.warn('Nginx binary not found or configuration check failed:', nginxErr.message);
+      }
+
+      // If SSL enabled, trigger certbot
+      if (sslEnabled === 1) {
+        try {
+          execSync(`certbot --nginx -d ${domain} --non-interactive --agree-tos --register-unsafely-without-email`, { stdio: 'ignore' });
+          execSync('systemctl reload nginx', { stdio: 'ignore' });
+        } catch (certErr) {
+          console.warn('Certbot SSL certificate generation failed:', certErr.message);
+        }
+      }
+    }
+
+    res.json({ success: true, message: `Domain ${domain} successfully proxied to port ${port}.` });
+  } catch (err) {
+    res.status(500).json({ error: 'Proxy binding failed: ' + err.message });
+  }
+});
+
+app.post('/api/domains/unbind', async (req, res) => {
+  const { domain } = req.body;
+  if (!domain) return res.status(400).json({ error: 'domain is required.' });
+
+  const isLinux = process.platform === 'linux';
+  const vhostPath = isLinux ? `/etc/nginx/sites-available/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-${domain}`);
+  const symlinkPath = isLinux ? `/etc/nginx/sites-enabled/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-enabled-${domain}`);
+
+  try {
+    if (fs.existsSync(symlinkPath)) fs.unlinkSync(symlinkPath);
+    if (fs.existsSync(vhostPath)) fs.unlinkSync(vhostPath);
+
+    if (isLinux) {
+      const { execSync } = require('child_process');
+      try {
+        execSync('systemctl reload nginx', { stdio: 'ignore' });
+      } catch (_) {}
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Proxy unbinding failed: ' + err.message });
+  }
+});
+
+
 // ─── System telemetry endpoints ───────────────────────────────
 app.get('/api/system/stats', async (req, res) => {
   // Standalone CPU/RAM metrics calculation

@@ -176,6 +176,19 @@ function stopApp(appId, signal = null) {
     throw new Error('Application is not active');
   }
 
+  // Handle docker-compose cleanup down command
+  const isDockerCompose = entry.config?.runtime === 'docker-compose' || entry.config?.start_cmd?.includes('docker compose');
+  if (isDockerCompose) {
+    const workDir = getAppDir(appId);
+    exec('docker compose down', { cwd: workDir }, (err, stdout, stderr) => {
+      if (err) {
+        console.error(`[Daemon Docker Compose Stop Error] App: ${appId}, Error: ${err.message}`);
+      } else {
+        console.log(`[Daemon Docker Compose Stop Success] App: ${appId}`);
+      }
+    });
+  }
+
   if (IS_WIN) {
     if (signal === 'SIGKILL') {
       exec(`taskkill /PID ${entry.pid} /T /F`, () => {});

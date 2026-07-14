@@ -130,6 +130,33 @@ function initDatabase() {
     );
   `);
 
+  // Domains Mapping & SSL proxy configuration
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS domains (
+      id          TEXT    PRIMARY KEY,
+      app_id      TEXT    NOT NULL,
+      domain      TEXT    UNIQUE NOT NULL,
+      ssl_enabled INTEGER NOT NULL DEFAULT 0,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Cron Job Scheduler Tasks
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cron_jobs (
+      id          TEXT    PRIMARY KEY,
+      app_id      TEXT    NOT NULL,
+      name        TEXT    NOT NULL,
+      expression  TEXT    NOT NULL,
+      command     TEXT    NOT NULL,
+      status      TEXT    NOT NULL DEFAULT 'idle',
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+      last_run    TEXT    DEFAULT NULL,
+      FOREIGN KEY (app_id) REFERENCES apps(id) ON DELETE CASCADE
+    );
+  `);
+
   // Insert default local node if empty
   try {
     const count = db.prepare('SELECT COUNT(*) AS count FROM nodes').get().count;

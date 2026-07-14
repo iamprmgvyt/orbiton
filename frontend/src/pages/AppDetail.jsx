@@ -4,8 +4,23 @@ import { Terminal as Xterm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { io } from 'socket.io-client';
 import 'xterm/css/xterm.css';
-import { Play, Square, RotateCw, Trash2, Cpu, Terminal as TerminalIcon, Info, ClipboardList, Send, ArrowLeft } from 'lucide-react';
+import { 
+  Play, 
+  Square, 
+  RotateCw, 
+  Trash2, 
+  Cpu, 
+  Terminal as TerminalIcon, 
+  Info, 
+  ClipboardList, 
+  Send, 
+  ArrowLeft, 
+  Globe, 
+  Calendar, 
+  ShieldAlert 
+} from 'lucide-react';
 
+// ─── Backups Tab Component ─────────────────────────────────────
 function BackupsTab({ appId }) {
   const [backups, setBackups] = useState([]);
   const [newBackupName, setNewBackupName] = useState('');
@@ -141,6 +156,306 @@ function BackupsTab({ appId }) {
   );
 }
 
+// ─── Domains Tab Component ────────────────────────────────────
+function DomainsTab({ appId }) {
+  const [domains, setDomains] = useState([]);
+  const [newDomain, setNewDomain] = useState('');
+  const [targetPort, setTargetPort] = useState('');
+  const [sslEnabled, setSslEnabled] = useState(false);
+  const [binding, setBinding] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDomains = async () => {
+    try {
+      const data = await api(`/domains/${appId}`);
+      setDomains(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDomains();
+    // Pre-populate target port based on App metadata if possible
+    api(`/apps/${appId}`).then(data => {
+      if (data && data.env_vars && data.env_vars.PORT) {
+        setTargetPort(data.env_vars.PORT);
+      }
+    }).catch(() => {});
+  }, [appId]);
+
+  const handleBind = async (e) => {
+    e.preventDefault();
+    if (!newDomain.trim() || !targetPort.trim()) return;
+    setBinding(true);
+    try {
+      await api(`/domains/${appId}/bind`, 'POST', {
+        domain: newDomain.trim(),
+        port: parseInt(targetPort),
+        sslEnabled
+      });
+      setNewDomain('');
+      setSslEnabled(false);
+      fetchDomains();
+      alert(`Domain ${newDomain} bound and proxied successfully!`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setBinding(false);
+    }
+  };
+
+  const handleUnbind = async (domainId) => {
+    if (!confirm('Are you sure you want to unbind this domain? Reverse proxy mapping will be deleted.')) return;
+    try {
+      await api(`/domains/${appId}/${domainId}`, 'DELETE');
+      fetchDomains();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Bind Domain Form */}
+      <form onSubmit={handleBind} className="bg-bg2/20 border border-border/40 rounded-xl p-4 space-y-4">
+        <h4 className="font-bold text-xs text-text2 uppercase tracking-wider">Bind Domain & Reverse Proxy</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] text-muted uppercase font-bold tracking-wider mb-2">Domain Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. app.mywebsite.com"
+              value={newDomain}
+              onChange={e => setNewDomain(e.target.value)}
+              className="w-full bg-[#030307] border border-border/80 rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-muted uppercase font-bold tracking-wider mb-2">Target Port</label>
+            <input
+              type="number"
+              required
+              placeholder="e.g. 3000"
+              value={targetPort}
+              onChange={e => setTargetPort(e.target.value)}
+              className="w-full bg-[#030307] border border-border/80 rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-4 pt-2">
+          <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer font-semibold">
+            <input
+              type="checkbox"
+              checked={sslEnabled}
+              onChange={e => setSslEnabled(e.target.checked)}
+              className="accent-accent w-4 h-4 rounded"
+            />
+            Auto-SSL Let's Encrypt Proxy (Ubuntu Nginx VPS only)
+          </label>
+          <button
+            type="submit"
+            disabled={binding}
+            className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-lg transition-all"
+          >
+            {binding ? 'Binding...' : 'Bind Domain'}
+          </button>
+        </div>
+      </form>
+
+      {/* Domain list */}
+      <div className="space-y-4">
+        <h4 className="font-bold text-xs text-text2 uppercase tracking-wider">Active Domain Mappings</h4>
+        {loading ? (
+          <div className="text-center text-xs text-muted py-6">Loading domains...</div>
+        ) : domains.length === 0 ? (
+          <div className="text-center text-xs text-muted py-12 border border-dashed border-border rounded-xl">
+            No custom domains configured for this application.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {domains.map(d => (
+              <div key={d.id} className="bg-bg2/40 border border-border/40 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <span className="block text-sm font-bold text-text hover:text-accent cursor-pointer">{d.domain}</span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-green-400 bg-green-500/10 px-2 py-0.5 rounded mt-2 border border-green-500/15">
+                    {d.ssl_enabled === 1 ? '🔒 HTTPS Let\'s Encrypt' : '🌐 HTTP Standard Proxy'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => handleUnbind(d.id)}
+                  className="text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 p-2 rounded-lg border border-red-500/10 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Cron Scheduler Tab Component ─────────────────────────────
+function CronsTab({ appId }) {
+  const [crons, setCrons] = useState([]);
+  const [name, setName] = useState('');
+  const [expression, setExpression] = useState('0 0 * * *');
+  const [command, setCommand] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchCrons = async () => {
+    try {
+      const data = await api(`/crons/${appId}`);
+      setCrons(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCrons();
+  }, [appId]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!name.trim() || !expression.trim() || !command.trim()) return;
+    setSaving(true);
+    try {
+      await api(`/crons/${appId}`, 'POST', {
+        name: name.trim(),
+        expression: expression.trim(),
+        command: command.trim()
+      });
+      setName('');
+      setExpression('0 0 * * *');
+      setCommand('');
+      fetchCrons();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (cronId) => {
+    if (!confirm('Are you sure you want to delete this scheduled task?')) return;
+    try {
+      await api(`/crons/${appId}/${cronId}`, 'DELETE');
+      fetchCrons();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Create Cron Form */}
+      <form onSubmit={handleCreate} className="bg-bg2/20 border border-border/40 rounded-xl p-4 space-y-4">
+        <h4 className="font-bold text-xs text-text2 uppercase tracking-wider">Create Cron Task Schedule</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] text-muted uppercase font-bold tracking-wider mb-2">Task Name</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Daily Log Cleanup"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full bg-[#030307] border border-border/80 rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-muted uppercase font-bold tracking-wider mb-2">Cron Expression</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. 0 0 * * * (At 00:00 everyday)"
+              value={expression}
+              onChange={e => setExpression(e.target.value)}
+              className="w-full bg-[#030307] border border-border/80 rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent font-mono"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] text-muted uppercase font-bold tracking-wider mb-2">Execute Shell Command</label>
+          <input
+            type="text"
+            required
+            placeholder="e.g. rm -rf logs/*.log or npm run build"
+            value={command}
+            onChange={e => setCommand(e.target.value)}
+            className="w-full bg-[#030307] border border-border/80 rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent font-mono"
+          />
+        </div>
+        <div className="flex justify-end pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2.5 rounded-lg transition-all"
+          >
+            {saving ? 'Creating...' : 'Create Cron Task'}
+          </button>
+        </div>
+      </form>
+
+      {/* Cron list */}
+      <div className="space-y-4">
+        <h4 className="font-bold text-xs text-text2 uppercase tracking-wider">Scheduled Tasks</h4>
+        {loading ? (
+          <div className="text-center text-xs text-muted py-6">Loading tasks...</div>
+        ) : crons.length === 0 ? (
+          <div className="text-center text-xs text-muted py-12 border border-dashed border-border rounded-xl">
+            No scheduled cron tasks configured.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {crons.map(c => (
+              <div key={c.id} className="bg-bg2/40 border border-border/40 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="block text-sm font-bold text-text">{c.name}</span>
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider border ${
+                      c.status === 'running' 
+                        ? 'bg-green-500/10 text-green-400 border-green-500/15 animate-pulse'
+                        : 'bg-surface2 text-muted border-border'
+                    }`}>
+                      {c.status}
+                    </span>
+                  </div>
+                  <span className="block text-xs text-muted">
+                    Schedule: <code className="bg-bg px-1.5 py-0.5 rounded text-accent font-mono">{c.expression}</code>
+                  </span>
+                  <span className="block text-xs text-text2">
+                    Command: <code className="bg-[#030307] px-2 py-1 rounded text-text2 font-mono break-all">{c.command}</code>
+                  </span>
+                  {c.last_run && (
+                    <span className="block text-[10px] text-muted">Last run: {new Date(c.last_run).toLocaleString()}</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(c.id)}
+                  className="text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 p-2 rounded-lg border border-red-500/10 transition-all self-end sm:self-center"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main AppDetail Page ──────────────────────────────────────
 export default function AppDetail({ appId, initialTab = 'console', onBack, onRefreshTrigger }) {
   const [app, setApp] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -155,7 +470,6 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     try {
       const data = await api(`/apps/${appId}`);
       setApp(data);
-      // Auto-fallback activeTab if console permission is missing
       if (data.permissions && data.permissions.can_console === 0 && activeTab === 'console') {
         setActiveTab('info');
       }
@@ -197,7 +511,6 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     if (activeTab !== 'console' || !app || !terminalRef.current) return;
     if (app.permissions && app.permissions.can_console === 0) return;
 
-    // Initialize Xterm
     const term = new Xterm({
       theme: {
         background: '#030307',
@@ -217,12 +530,11 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     xtermInstance.current = term;
     fitAddonInstance.current = fit;
 
-    // Fetch and display log history
     const loadHistory = async () => {
       try {
         term.write('\x1b[36m[Orbiton] Loading logs history...\x1b[0m\r\n');
         const logsData = await api(`/apps/${appId}/logs?lines=300`);
-        term.write('\x1bc'); // clear screen
+        term.write('\x1bc');
         if (logsData.logs && logsData.logs.length > 0) {
           logsData.logs.forEach(line => {
             term.write(line.replace(/\r?\n/g, '\r\n') + '\r\n');
@@ -236,13 +548,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     };
 
     loadHistory().then(() => {
-      // Connect to Socket IO for live PTY stream
       const socket = socketRef.current;
       if (socket) {
         socket.emit('terminal:create', { appId, cols: term.cols, rows: term.rows });
-        
         socket.on('terminal:data', ({ data }) => term.write(data));
-        
         term.onData(data => {
           socket.emit('terminal:input', { input: data });
         });
@@ -308,6 +617,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   const isRunning = app.status === 'running' || app.status === 'starting';
   const canPower = app.permissions ? app.permissions.can_power === 1 : true;
   const canConsole = app.permissions ? app.permissions.can_console === 1 : true;
+  const canFiles = app.permissions ? app.permissions.can_files === 1 : true;
 
   return (
     <div className="space-y-6">
@@ -329,7 +639,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
                 app.runtime === 'nodejs' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nodejs/nodejs-original.svg' :
                 app.runtime === 'python' || app.runtime === 'python3' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg' :
                 app.runtime === 'java' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/java/java-original.svg' :
-                app.runtime === 'docker' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg' :
+                app.runtime === 'docker' || app.runtime === 'docker-compose' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg' :
                 app.runtime === 'go' || app.runtime === 'golang' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original-wordmark.svg' :
                 app.runtime === 'rust' ? 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/rust/rust-original.svg' :
                 'https://cdn.jsdelivr.net/gh/devicons/devicon/icons/codepen/codepen-plain.svg'
@@ -404,7 +714,11 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
         {[
           ...(canConsole ? [{ id: 'console', label: '⌨️ Server Console', icon: TerminalIcon }] : []),
           { id: 'info', label: 'ℹ️ Server Info', icon: Info },
-          { id: 'backups', label: '🛡️ Backups & Restore', icon: ClipboardList }
+          ...(canFiles ? [
+            { id: 'domains', label: '🌐 Domains & Proxy', icon: Globe },
+            { id: 'backups', label: '🛡️ Backups & Restore', icon: ClipboardList }
+          ] : []),
+          { id: 'crons', label: '📅 Cron Scheduler', icon: Calendar }
         ].map(tab => {
           const Icon = tab.icon;
           return (
@@ -482,8 +796,18 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
         )}
 
         {/* Backups Tab */}
-        {activeTab === 'backups' && (
+        {canFiles && activeTab === 'backups' && (
           <BackupsTab appId={appId} />
+        )}
+
+        {/* Domains Tab */}
+        {canFiles && activeTab === 'domains' && (
+          <DomainsTab appId={appId} />
+        )}
+
+        {/* Cron Scheduler Tab */}
+        {activeTab === 'crons' && (
+          <CronsTab appId={appId} />
         )}
       </div>
     </div>
