@@ -611,10 +611,15 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     }
   };
 
-  const handleClearConsole = () => {
-    if (xtermInstance.current) {
-      xtermInstance.current.clear();
-      xtermInstance.current.write('\x1b[32m[Orbiton] Console screen cleared.\x1b[0m\r\n');
+  const handleClearConsole = async () => {
+    try {
+      await api(`/apps/${appId}/logs/clear`, 'POST');
+      if (xtermInstance.current) {
+        xtermInstance.current.clear();
+        xtermInstance.current.write('\x1b[32m[Orbiton] Console screen cleared.\x1b[0m\r\n');
+      }
+    } catch (err) {
+      alert(err.message);
     }
   };
 

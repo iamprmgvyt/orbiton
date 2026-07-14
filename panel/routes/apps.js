@@ -483,20 +483,31 @@ function getAuthorizedApp(req, res) {
 }
 
 // GET /api/apps/:id/logs-history - Fetch historical console logs
-router.get('/:id/logs-history', (req, res) => {
+router.get('/:id/logs-history', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
-    const logs = db.prepare(`
-      SELECT line, timestamp 
-      FROM app_logs 
-      WHERE app_id = ? 
-      ORDER BY id DESC 
-      LIMIT 100
-    `).all(app.id);
+    // Fetch logs history directly from the daemon hosting this app (reads console.log 24/7)
+    const data = await daemonRequest(`/api/apps/${app.id}/logs?lines=200`, 'GET', null, app.node_id);
     
-    // Reverse logs to show chronological order
-    res.json(logs.reverse());
+    // Map array of log lines to match frontend format [{ line: "...", timestamp: "..." }]
+    const logs = (data.logs || []).map(line => ({
+      line,
+      timestamp: new Date().toISOString()
+    }));
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/apps/:id/logs/clear - Clear daemon log file
+router.post('/:id/logs/clear', async (req, res) => {
+  const app = getAuthorizedApp(req, res);
+  if (!app) return;
+  try {
+    await daemonRequest(`/api/apps/${app.id}/logs/clear`, 'POST', null, app.node_id);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
