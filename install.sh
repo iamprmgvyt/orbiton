@@ -268,7 +268,24 @@ update_orbiton() {
   else
     echo -e "${YELLOW}Pulling code updates from local Git repository...${NC}"
     cd "$SCRIPT_DIR"
-    git pull >> $LOG_PATH 2>&1 || echo -e "${RED}⚠ Failed to pull git updates, proceeding with local files...${NC}"
+    # Fix Git dubious ownership security check (safe.directory) when running as sudo root
+    git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
+    
+    # Stash any local manual modifications to prevent pull block conflicts
+    git stash 2>/dev/null || true
+
+    if git pull >> $LOG_PATH 2>&1; then
+      echo -e "${GREEN}✔ Successfully pulled updates from GitHub.${NC}"
+    else
+      # Fallback to force update from remote branch if normal pull fails
+      echo -e "${YELLOW}Pull failed. Attempting hard reset from origin...${NC}"
+      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
+      if git fetch --all >> $LOG_PATH 2>&1 && git reset --hard "origin/$CURRENT_BRANCH" >> $LOG_PATH 2>&1; then
+        echo -e "${GREEN}✔ Successfully synchronized code with origin/$CURRENT_BRANCH.${NC}"
+      else
+        echo -e "${RED}❌ Failed to pull git updates, proceeding with local files...${NC}"
+      fi
+    fi
   fi
 
   if [ -d "$PANEL_DIR" ]; then
