@@ -122,13 +122,7 @@ sudo orbiton help
 ### 🎨 Premium Multi-Theme Customizer
 
 Orbiton provides 5 gorgeous built-in themes (Cyberpunk, Ocean, Emerald, Sakura, Nordic) map-linked with smooth color transition states. 
-* To switch themes: Go to **Settings** -> **Giao diện & Themes** and select your preferred palette.
-
-### 🔌 Blueprint.zip Extension Support (Ptero-style)
-
-Orbiton now includes a compatibility engine for Pterodactyl extensions and themes packaged inside `blueprint.zip`.
-* **How to Install**: Go to **Settings** -> **Blueprint Extensions** (Admin Only), select the `.zip` / `.blueprint` package, and click **Install Extension**. 
-* The Panel daemon will automatically extract the code, map assets, and trigger a background build script to reload the UI.
+* To switch themes: Go to **Settings** -> **Themes & Style** and select your preferred palette.
 
 ---
 
@@ -158,7 +152,7 @@ node server.js
 
 | Component | Default Port | Default Credential |
 |-----------|--------------|-------------------|
-| **Web Panel** | `3000` (HTTP) / `3443` (HTTPS) | Set up your custom Admin account on first browser access! |
+| **Web Panel** | `80` (Main IP) or `3000` (Custom) | Set up your custom Admin account on first browser access! |
 | **Daemon Node** | `9900` (HTTP) | Secure Master Token (defined in `.env`) |
 
 ---
