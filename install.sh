@@ -252,15 +252,28 @@ EOF
 update_orbiton() {
   echo -e "\n${YELLOW}🔄 Updating Orbiton Panel & Daemon to the latest version...${NC}"
   
-  if [ -d "$SCRIPT_DIR/.git" ]; then
-    echo -e "${YELLOW}Pulling code updates from GitHub...${NC}"
+  local clone_dir="$SCRIPT_DIR"
+  local temp_created=false
+  local TEMP_DIR=""
+
+  if [ ! -d "$SCRIPT_DIR/.git" ]; then
+    echo -e "${YELLOW}No local Git repository found. Downloading latest updates from GitHub...${NC}"
+    TEMP_DIR=$(mktemp -d)
+    if git clone https://github.com/iamprmgvyt/orbiton.git "$TEMP_DIR" >> $LOG_PATH 2>&1; then
+      clone_dir="$TEMP_DIR"
+      temp_created=true
+    else
+      echo -e "${RED}❌ Failed to clone latest repository from GitHub. Proceeding with local files...${NC}"
+    fi
+  else
+    echo -e "${YELLOW}Pulling code updates from local Git repository...${NC}"
     cd "$SCRIPT_DIR"
-    git pull >> $LOG_PATH 2>&1 || echo -e "${RED}⚠ Failed to pull git updates, proceeding with local rebuild...${NC}"
+    git pull >> $LOG_PATH 2>&1 || echo -e "${RED}⚠ Failed to pull git updates, proceeding with local files...${NC}"
   fi
 
   if [ -d "$PANEL_DIR" ]; then
     echo -e "${YELLOW}Updating Panel package files...${NC}"
-    cp -rf "$SCRIPT_DIR/panel/"* "$PANEL_DIR/"
+    cp -rf "$clone_dir/panel/"* "$PANEL_DIR/"
     cd "$PANEL_DIR"
     npm install --omit=dev >> $LOG_PATH 2>&1
     systemctl restart orbiton-panel || true
@@ -269,11 +282,22 @@ update_orbiton() {
 
   if [ -d "$DAEMON_DIR" ]; then
     echo -e "${YELLOW}Updating Daemon package files...${NC}"
-    cp -rf "$SCRIPT_DIR/daemon/"* "$DAEMON_DIR/"
+    cp -rf "$clone_dir/daemon/"* "$DAEMON_DIR/"
     cd "$DAEMON_DIR"
     npm install --omit=dev >> $LOG_PATH 2>&1
     systemctl restart orbiton-daemon || true
     echo -e "${GREEN}✔ Orbiton Daemon updated & restarted.${NC}"
+  fi
+
+  # Register global CLI command as well on update
+  if [ -f "$clone_dir/orbiton.sh" ]; then
+    cp "$clone_dir/orbiton.sh" /usr/local/bin/orbiton 2>/dev/null || true
+    chmod +x /usr/local/bin/orbiton 2>/dev/null || true
+  fi
+
+  # Clean up temp dir if created
+  if [ "$temp_created" = true ] && [ -d "$TEMP_DIR" ]; then
+    rm -rf "$TEMP_DIR"
   fi
 
   echo -e "${GREEN}${BOLD}🪐 Orbiton Update Completed Successfully!${NC}\n"
