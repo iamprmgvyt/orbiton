@@ -50,7 +50,7 @@ export default function App() {
 
     const handleRouting = () => {
       const path = window.location.pathname;
-      const m = path.match(/^\/server\/([^/]+)(?:\/(console|files|logs|info))?$/);
+      const m = path.match(/^\/server\/([^/]+)(?:\/(console|info|domains|backups|crons|settings|logs))?$/);
       if (m) {
         let [, appId, tab] = m;
         if (tab === 'logs') tab = 'console';
@@ -159,6 +159,7 @@ export default function App() {
               initialTab={initialDetailTab}
               onBack={handleBackToApps}
               onRefreshTrigger={refreshTrigger}
+              onTabChange={(tabId) => handleOpenAppDetail(selectedAppId, tabId)}
             />
           )}
           {activePage === 'files' && (

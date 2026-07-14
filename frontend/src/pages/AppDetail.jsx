@@ -458,10 +458,14 @@ function CronsTab({ appId }) {
 }
 
 // ─── Main AppDetail Page ──────────────────────────────────────
-export default function AppDetail({ appId, initialTab = 'console', onBack, onRefreshTrigger }) {
+export default function AppDetail({ appId, initialTab = 'console', onBack, onRefreshTrigger, onTabChange }) {
   const [app, setApp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   
   const terminalRef = useRef(null);
   const xtermInstance = useRef(null);
@@ -852,7 +856,10 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                setActiveTab(tab.id);
+                if (onTabChange) onTabChange(tab.id);
+              }}
               className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
                 activeTab === tab.id
                   ? 'border-accent text-accent bg-accent/5'
