@@ -58,19 +58,61 @@ setup_swap() {
     ram_total=4096
   fi
   
-  if [ "$ram_total" -lt 4000 ] && [ "$swap_total" -eq 0 ]; then
-    echo -e "${YELLOW}Low physical memory detected ($ram_total MB RAM) and no Swap space configured.${NC}"
-    echo -e "${YELLOW}Creating a 2GB Swap file to prevent installation bottlenecks and out-of-memory crashes...${NC}"
-    
-    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 >> $LOG_PATH 2>&1
-    chmod 600 /swapfile
-    mkswap /swapfile >> $LOG_PATH 2>&1
-    swapon /swapfile >> $LOG_PATH 2>&1
-    
-    if ! grep -q "/swapfile" /etc/fstab; then
-      echo "/swapfile none swap sw 0 0" >> /etc/fstab
+  # Check if RAM is between 512MB and 3GB (3072MB)
+  if [ "$ram_total" -ge 500 ] && [ "$ram_total" -le 3100 ]; then
+    if [ "$swap_total" -gt 0 ]; then
+      echo -e "${GREEN}✔ Swap space already configured (${swap_total}MB). Skipping setup.${NC}"
+      return
     fi
-    echo -e "${GREEN}✔ 2GB Swap Space successfully created and activated!${NC}"
+
+    echo -e "\n${YELLOW}⚠️ Low physical memory detected ($ram_total MB RAM).${NC}"
+    echo -e "${YELLOW}======================================================================${NC}"
+    echo -e "We recommend creating a Swap file (virtual memory) to prevent installer"
+    echo -e "bottlenecks and Out-Of-Memory (OOM) system crashes."
+    echo -e ""
+    echo -e "${BOLD}🔴 IMPORTANT WARNING (Disk Throttling & I/O Bottlenecks):${NC}"
+    echo -e "Setting a Swap size too large on shared cloud VPS instances will trigger"
+    echo -e "heavy disk read/write throttling from your provider, degrading system"
+    echo -e "performance dramatically."
+    echo -e ""
+    echo -e "${BOLD}📖 Visual Analogy:${NC}"
+    echo -e "  If you have a 2GB document folder placed on your desk (small swap),"
+    echo -e "  it is very easy and fast to find files when your hands are busy."
+    echo -e "  But if you scatter a massive 20GB of documents all over the floor"
+    echo -e "  (excessive swap), it will take you ages to search and crawl, slowing"
+    echo -e "  down the entire system to a crawl."
+    echo -e ""
+    echo -e "👉 Recommended Swap Size: ${BOLD}1GB or 2GB${NC}."
+    echo -e "${YELLOW}======================================================================${NC}"
+    
+    echo -n -e "* Would you like to create a Swap file? (y/N): "
+    read -r create_swap_choice
+    
+    if [[ "$create_swap_choice" =~ [Yy] ]]; then
+      echo -n -e "  Enter Swap size in GB [1-4, Default: 2]: "
+      read -r swap_size_input
+      
+      # Default to 2 if input is empty or not a number
+      if [ -z "$swap_size_input" ] || ! [[ "$swap_size_input" =~ ^[1-9][0-9]*$ ]]; then
+        swap_size_input=2
+      fi
+      
+      echo -e "${YELLOW}  Creating a ${swap_size_input}GB Swap file, please wait...${NC}"
+      local swap_size_mb=$((swap_size_input * 1024))
+      
+      # Allocate swap
+      fallocate -l ${swap_size_input}G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=${swap_size_mb} >> $LOG_PATH 2>&1
+      chmod 600 /swapfile
+      mkswap /swapfile >> $LOG_PATH 2>&1
+      swapon /swapfile >> $LOG_PATH 2>&1
+      
+      if ! grep -q "/swapfile" /etc/fstab; then
+        echo "/swapfile none swap sw 0 0" >> /etc/fstab
+      fi
+      echo -e "${GREEN}✔ ${swap_size_input}GB Swap Space successfully created and activated!${NC}\n"
+    else
+      echo -e "${YELLOW}  Skipping Swap file creation. Proceeding with raw memory...${NC}\n"
+    fi
   fi
 }
 
