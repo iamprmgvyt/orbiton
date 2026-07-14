@@ -13,7 +13,7 @@
 
 ---
 
-[📖 Read Documentation](https://orbiton-seven.vercel.app) | [⚡ Quick Setup](#-installation--setup) | [🤝 Contributing Guide](#-contributing--development) | [💬 Submit Feedback](https://orbiton-seven.vercel.app/#feedback)
+[📖 Read Documentation](https://docs-orbiton.vercel.app/) | [⚡ Quick Setup](#-installation--setup) | [🤝 Contributing Guide](#-contributing--development) | [💬 Submit Feedback](https://docs-orbiton.vercel.app/#feedback)
 
 </div>
 
@@ -143,7 +143,7 @@ Let's make server management beautiful and fast together!
 ---
 
 ## 💬 Feedback & Reviews
-We love to hear from our users. Please share your suggestions and rate your experience on our interactive **[Feedback & Review Board](https://orbiton-seven.vercel.app/#feedback)**.
+We love to hear from our users. Please share your suggestions and rate your experience on our interactive **[Feedback & Review Board](https://docs-orbiton.vercel.app/#feedback)**.
 
 ---
 
