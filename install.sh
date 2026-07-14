@@ -249,6 +249,37 @@ EOF
   echo -e "${GREEN}✔ Orbiton Daemon (Wings) started on port 9900!${NC}"
 }
 
+update_orbiton() {
+  echo -e "\n${YELLOW}🔄 Updating Orbiton Panel & Daemon to the latest version...${NC}"
+  
+  if [ -d "$SCRIPT_DIR/.git" ]; then
+    echo -e "${YELLOW}Pulling code updates from GitHub...${NC}"
+    cd "$SCRIPT_DIR"
+    git pull >> $LOG_PATH 2>&1 || echo -e "${RED}⚠ Failed to pull git updates, proceeding with local rebuild...${NC}"
+  fi
+
+  if [ -d "$PANEL_DIR" ]; then
+    echo -e "${YELLOW}Updating Panel package files...${NC}"
+    cp -rf "$SCRIPT_DIR/panel/"* "$PANEL_DIR/"
+    cd "$PANEL_DIR"
+    npm install --omit=dev >> $LOG_PATH 2>&1
+    systemctl restart orbiton-panel || true
+    echo -e "${GREEN}✔ Orbiton Panel updated & restarted.${NC}"
+  fi
+
+  if [ -d "$DAEMON_DIR" ]; then
+    echo -e "${YELLOW}Updating Daemon package files...${NC}"
+    cp -rf "$SCRIPT_DIR/daemon/"* "$DAEMON_DIR/"
+    cd "$DAEMON_DIR"
+    npm install --omit=dev >> $LOG_PATH 2>&1
+    systemctl restart orbiton-daemon || true
+    echo -e "${GREEN}✔ Orbiton Daemon updated & restarted.${NC}"
+  fi
+
+  echo -e "${GREEN}${BOLD}🪐 Orbiton Update Completed Successfully!${NC}\n"
+  exit 0
+}
+
 uninstall_orbiton() {
   echo -e "\n${RED}🛑 Uninstalling Orbiton Panel and Daemon...${NC}"
   systemctl stop orbiton-panel --quiet 2>/dev/null || true
@@ -281,6 +312,7 @@ while [ "$done" == false ]; do
     "Install Panel only (Central UI & User Database)"
     "Install Daemon only (Wings Agent on Node VPS)"
     "Configure Let's Encrypt SSL certificate"
+    "Update Orbiton to the Latest Version & Restart Services"
     "Uninstall Panel & Daemon"
     "Cancel / Exit"
   )
@@ -322,10 +354,14 @@ while [ "$done" == false ]; do
       done=true
       ;;
     4)
-      uninstall_orbiton
+      update_orbiton
       done=true
       ;;
     5)
+      uninstall_orbiton
+      done=true
+      ;;
+    6)
       echo -e "${YELLOW}Installation cancelled. Thank you for using Orbiton!${NC}\n"
       exit 0
       ;;
