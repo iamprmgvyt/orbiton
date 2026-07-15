@@ -20,7 +20,7 @@ PANEL_DIR="/opt/orbiton-panel"
 DAEMON_DIR="/opt/orbiton-daemon"
 DATA_DIR="/opt/orbiton-data"
 LOG_PATH="/var/log/orbiton-installer.log"
-PANEL_PORT=8080
+PANEL_PORT=3000
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; NC='\033[0m'; BOLD='\033[1m'
@@ -224,7 +224,7 @@ install_panel() {
   # Network Port Selection Prompt
   echo -e "\n${YELLOW}* Configure Panel Network Port:${NC}"
   echo -e "  [1] Run directly on Main IP (Port 80)"
-  echo -e "  [2] Run on a Custom Port (Default: 8080)"
+  echo -e "  [2] Run on a Custom Port (Default: 3000)"
   echo -n -e "  Select option [1-2, Default: 2]: "
   read -r port_choice
 
@@ -232,12 +232,12 @@ install_panel() {
     PANEL_PORT=80
     echo -e "  ${GREEN}✔ Panel configured to run on Port 80 (Main IP).${NC}"
   else
-    echo -n -e "  Enter custom port [Default: 8080]: "
+    echo -n -e "  Enter custom port [Default: 3000]: "
     read -r custom_port
     if [ ! -z "$custom_port" ]; then
       PANEL_PORT=$custom_port
     else
-      PANEL_PORT=8080
+      PANEL_PORT=3000
     fi
     echo -e "  ${GREEN}✔ Panel configured to run on Port ${PANEL_PORT}.${NC}"
   fi

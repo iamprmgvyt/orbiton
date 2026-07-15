@@ -1,6 +1,6 @@
 {
   "name": "orbiton-daemon",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Orbiton Daemon (Wings equivalent) — Runs process terminals, file manager, and daemon apps.",
   "main": "server.js",
   "scripts": {
