@@ -20,6 +20,7 @@ const fileRoutes   = require('./routes/files');
 const systemRoutes = require('./routes/system');
 const { setupSocketHandlers } = require('./managers/terminalManager');
 const authMiddleware = require('./middleware/auth');
+const userRateLimit = require('./middleware/userRateLimit');
 
 const app = express();
 
@@ -52,14 +53,14 @@ app.use(express.static(FRONTEND));
 
 // ─── API Routes ───────────────────────────────────────────────
 app.use('/api/auth',   authRoutes);
-app.use('/api/apps',   authMiddleware, appsRoutes);
-app.use('/api/files',  authMiddleware, fileRoutes);
-app.use('/api/system', authMiddleware, systemRoutes);
-app.use('/api/nodes',  authMiddleware, require('./routes/nodes'));
-app.use('/api/permissions', authMiddleware, require('./routes/permissions'));
-app.use('/api/backups',     authMiddleware, require('./routes/backups'));
-app.use('/api/domains',     authMiddleware, require('./routes/domains'));
-app.use('/api/crons',       authMiddleware, require('./routes/crons'));
+app.use('/api/apps',   authMiddleware, userRateLimit(120), appsRoutes);
+app.use('/api/files',  authMiddleware, userRateLimit(150), fileRoutes);
+app.use('/api/system', authMiddleware, userRateLimit(100), systemRoutes);
+app.use('/api/nodes',  authMiddleware, userRateLimit(60), require('./routes/nodes'));
+app.use('/api/permissions', authMiddleware, userRateLimit(60), require('./routes/permissions'));
+app.use('/api/backups',     authMiddleware, userRateLimit(50), require('./routes/backups'));
+app.use('/api/domains',     authMiddleware, userRateLimit(60), require('./routes/domains'));
+app.use('/api/crons',       authMiddleware, userRateLimit(60), require('./routes/crons'));
 
 // Catch-all → serve React frontend SPA index.html
 app.get('*', (req, res) => {

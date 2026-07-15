@@ -136,7 +136,7 @@ case "$1" in
     fi
     ;;
   version)
-    echo -e "Orbiton Orchestrator v1.14.0"
+    echo -e "Orbiton Orchestrator v1.15.0"
     ;;
   *)
     show_help
