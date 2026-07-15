@@ -24,9 +24,26 @@ function emit(event, data) {
   if (ioInstance) ioInstance.emit(event, data);
 }
 
+const terminalBuffers = new Map();
+
 function emitTerminalData(appId, data) {
-  if (ioInstance) {
-    ioInstance.to(`terminal:${appId}`).emit('terminal:data', { data });
+  if (!ioInstance) return;
+  
+  let currentBuffer = terminalBuffers.get(appId) || '';
+  currentBuffer += data;
+  terminalBuffers.set(appId, currentBuffer);
+
+  const timeoutKey = `timeout:${appId}`;
+  if (!terminalBuffers.has(timeoutKey)) {
+    const timeout = setTimeout(() => {
+      const finalData = terminalBuffers.get(appId);
+      terminalBuffers.delete(appId);
+      terminalBuffers.delete(timeoutKey);
+      if (finalData && ioInstance) {
+        ioInstance.to(`terminal:${appId}`).emit('terminal:data', { data: finalData });
+      }
+    }, 100); // 100ms throttle batch buffer to optimize socket traffic
+    terminalBuffers.set(timeoutKey, timeout);
   }
 }
 

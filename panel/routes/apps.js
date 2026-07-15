@@ -11,6 +11,7 @@ const FormData = require('form-data');
 const { db }   = require('../db/database');
 const { daemonRequest, DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi');
 const { checkPermission } = require('../middleware/permission');
+const cache = require('../db/cache');
 
 const router = express.Router();
 
@@ -138,6 +139,12 @@ const TEMPLATES = {
 // ─── List All Apps ────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
+    const cacheKey = `apps:list:${req.user.id}:${req.user.role}`;
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return res.json(cachedData);
+    }
+
     let apps;
     if (req.user.role === 'admin') {
       apps = db.prepare(`
@@ -185,6 +192,8 @@ router.get('/', async (req, res) => {
       };
     });
 
+    // Cache the resolved app list for 3 seconds to throttle heavy concurrent users
+    await cache.set(cacheKey, apps, 3);
     res.json(apps);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -245,6 +254,7 @@ router.post('/', (req, res) => {
   );
 
   const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+  cache.flush().catch(() => {});
   res.status(201).json(app);
 });
 
@@ -252,6 +262,13 @@ router.post('/', (req, res) => {
 router.get('/:id', async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
+
+  const cacheKey = `app:detail:${app.id}:${req.user.id}`;
+  const cachedData = await cache.get(cacheKey);
+  if (cachedData) {
+    return res.json(cachedData);
+  }
+
   const status = await daemonRequest(`/api/apps/${app.id}/status`, 'GET', null, app.node_id).catch(() => ({ status: 'stopped', pid: null }));
   
   let permissions = { can_power: 1, can_files: 1, can_console: 1 };
@@ -264,12 +281,16 @@ router.get('/:id', async (req, res) => {
     } : { can_power: 0, can_files: 0, can_console: 0 };
   }
 
-  res.json({ 
+  const appData = { 
     ...app, 
     env_vars: JSON.parse(app.env_vars || '{}'), 
     permissions,
     ...status 
-  });
+  };
+
+  // Cache single app detail for 2 seconds to throttle heavy websocket requests
+  await cache.set(cacheKey, appData, 2);
+  res.json(appData);
 });
 
 // ─── Update App ───────────────────────────────────────────────
@@ -319,6 +340,7 @@ router.patch('/:id', async (req, res) => {
     app.id
   );
 
+  cache.flush().catch(() => {});
   res.json(db.prepare('SELECT * FROM apps WHERE id = ?').get(app.id));
 });
 
@@ -331,6 +353,7 @@ router.delete('/:id', async (req, res) => {
   try { await daemonRequest(`/api/files/${app.id}/delete?path=/`, 'DELETE', null, app.node_id); } catch (_) {}
   
   db.prepare('DELETE FROM apps WHERE id = ?').run(app.id);
+  cache.flush().catch(() => {});
   res.json({ success: true });
 });
 
@@ -341,6 +364,7 @@ router.post('/:id/start', checkPermission('power'), async (req, res) => {
   try {
     const appConfig = { ...app, env_vars: JSON.parse(app.env_vars || '{}') };
     const result = await daemonRequest(`/api/apps/${app.id}/start`, 'POST', { appConfig }, app.node_id);
+    cache.flush().catch(() => {});
     res.json({ success: true, ...result });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -350,6 +374,7 @@ router.post('/:id/stop', checkPermission('power'), async (req, res) => {
   if (!app) return;
   try {
     await daemonRequest(`/api/apps/${app.id}/stop`, 'POST', null, app.node_id);
+    cache.flush().catch(() => {});
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -360,6 +385,7 @@ router.post('/:id/restart', checkPermission('power'), async (req, res) => {
   try {
     const appConfig = { ...app, env_vars: JSON.parse(app.env_vars || '{}') };
     await daemonRequest(`/api/apps/${app.id}/restart`, 'POST', { appConfig }, app.node_id);
+    cache.flush().catch(() => {});
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -369,6 +395,7 @@ router.post('/:id/kill', checkPermission('power'), async (req, res) => {
   if (!app) return;
   try {
     await daemonRequest(`/api/apps/${app.id}/kill`, 'POST', null, app.node_id);
+    cache.flush().catch(() => {});
     res.json({ success: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
