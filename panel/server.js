@@ -24,7 +24,7 @@ const authMiddleware = require('./middleware/auth');
 const app = express();
 
 // ─── Configuration ────────────────────────────────────────────
-const PORT     = parseInt(process.env.PORT     || '3000');
+const PORT     = parseInt(process.env.PORT     || '8080');
 const SSL_PORT = parseInt(process.env.SSL_PORT || '3443');
 const FRONTEND = path.join(__dirname, 'dist');
 
