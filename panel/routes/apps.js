@@ -12,6 +12,7 @@ const { db }   = require('../db/database');
 const { daemonRequest, DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi');
 const { checkPermission } = require('../middleware/permission');
 const cache = require('../db/cache');
+const userRateLimit = require('../middleware/userRateLimit');
 
 const router = express.Router();
 
@@ -358,7 +359,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ─── Process Control ──────────────────────────────────────────
-router.post('/:id/start', checkPermission('power'), async (req, res) => {
+router.post('/:id/start', checkPermission('power'), userRateLimit.power, async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -369,7 +370,7 @@ router.post('/:id/start', checkPermission('power'), async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/stop', checkPermission('power'), async (req, res) => {
+router.post('/:id/stop', checkPermission('power'), userRateLimit.power, async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -379,7 +380,7 @@ router.post('/:id/stop', checkPermission('power'), async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/restart', checkPermission('power'), async (req, res) => {
+router.post('/:id/restart', checkPermission('power'), userRateLimit.power, async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {
@@ -390,7 +391,7 @@ router.post('/:id/restart', checkPermission('power'), async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
-router.post('/:id/kill', checkPermission('power'), async (req, res) => {
+router.post('/:id/kill', checkPermission('power'), userRateLimit.power, async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {

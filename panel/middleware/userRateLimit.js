@@ -1,51 +1,89 @@
 // ============================================================
-// Orbiton User-Based Rate Limiter Middleware
-// Limits concurrent request spikes per individual User ID to protect
-// SQLite database and Daemon IO queue from spam.
-// Prevents memory leaks under high concurrent load on low-resource (1GB RAM) VPS.
+// Orbiton 2-Tier Situational Rate Limiter Middleware
+// Mitigates both Burst Spikes (short-term spam) and Sustained Abuse (long-term load)
+// per individual User ID or IP address.
+// Lightweight Map storage with auto-cleanup protects RAM on 1GB VPS.
 // ============================================================
 
 const requestTracker = new Map();
 
 /**
- * User-based Rate Limiter middleware
- * @param {number} limit Maximum requests allowed inside the window
- * @param {number} windowMs Time window in milliseconds (default: 1 minute)
+ * Core 2-Tier Rate Limiter Generator
+ * @param {object} options Limiter configuration
+ * @param {number} options.burstLimit Max requests in short window
+ * @param {number} options.burstWindowMs Short window duration (default: 2s)
+ * @param {number} options.sustainedLimit Max requests in long window
+ * @param {number} options.sustainedWindowMs Long window duration (default: 60s)
+ * @param {boolean} options.ipOnly Force IP-based limiting (for public endpoints)
  */
-module.exports = function userRateLimit(limit = 120, windowMs = 60000) {
+function createLimiter(options = {}) {
+  const {
+    burstLimit = 5,
+    burstWindowMs = 2000,
+    sustainedLimit = 100,
+    sustainedWindowMs = 60000,
+    ipOnly = false
+  } = options;
+
   return (req, res, next) => {
-    // Exempt administrators from rate limits to ensure clean operations
-    if (req.user && req.user.role === 'admin') {
+    // Exempt administrators from all rate limits
+    if (!ipOnly && req.user && req.user.role === 'admin') {
       return next();
     }
 
-    const userId = req.user ? req.user.id : req.ip;
+    const trackerId = (ipOnly || !req.user) ? req.ip : req.user.id;
     const now = Date.now();
 
-    let record = requestTracker.get(userId);
+    let record = requestTracker.get(trackerId);
 
-    if (!record || now > record.resetTime) {
+    if (!record) {
       record = {
-        count: 1,
-        resetTime: now + windowMs
+        burstCount: 1,
+        burstReset: now + burstWindowMs,
+        sustainedCount: 1,
+        sustainedReset: now + sustainedWindowMs
       };
-      requestTracker.set(userId, record);
+      requestTracker.set(trackerId, record);
       return next();
     }
 
-    record.count++;
-    if (record.count > limit) {
-      const retryAfterSeconds = Math.ceil((record.resetTime - now) / 1000);
-      res.setHeader('Retry-After', retryAfterSeconds);
+    // Reset short-term burst window if time passed
+    if (now > record.burstReset) {
+      record.burstCount = 0;
+      record.burstReset = now + burstWindowMs;
+    }
+
+    // Reset long-term sustained window if time passed
+    if (now > record.sustainedReset) {
+      record.sustainedCount = 0;
+      record.sustainedReset = now + sustainedWindowMs;
+    }
+
+    record.burstCount++;
+    record.sustainedCount++;
+
+    // 1. Check Burst Limit (Spam spikes protection)
+    if (record.burstCount > burstLimit) {
+      const retryAfter = Math.ceil((record.burstReset - now) / 1000) || 1;
+      res.setHeader('Retry-After', retryAfter);
       return res.status(429).json({
-        error: `Too many requests from your account. Please slow down. Try again in ${retryAfterSeconds} seconds.`
+        error: `Spam protection: Too many requests in a short time. Please slow down and try again in ${retryAfter} second(s).`
+      });
+    }
+
+    // 2. Check Sustained Limit (Long-term resource protection)
+    if (record.sustainedCount > sustainedLimit) {
+      const retryAfter = Math.ceil((record.sustainedReset - now) / 1000);
+      res.setHeader('Retry-After', retryAfter);
+      return res.status(429).json({
+        error: `Rate limit exceeded: Too many requests. Please try again in ${retryAfter} second(s).`
       });
     }
 
     // Proactive memory cleanup: prevents memory leaks on VPS with low RAM
-    if (requestTracker.size > 1000) {
+    if (requestTracker.size > 1500) {
       for (const [key, val] of requestTracker.entries()) {
-        if (now > val.resetTime) {
+        if (now > val.sustainedReset) {
           requestTracker.delete(key);
         }
       }
@@ -53,4 +91,48 @@ module.exports = function userRateLimit(limit = 120, windowMs = 60000) {
 
     next();
   };
+}
+
+// ─── Preset Situational Limiters ────────────────────────────────
+module.exports = {
+  // General Web Page Browsing/Dashboard
+  general: createLimiter({
+    burstLimit: 12,
+    burstWindowMs: 2000,
+    sustainedLimit: 120,
+    sustainedWindowMs: 60000
+  }),
+
+  // Auth Endpoints (Login/Register - Strict IP-based to counter bots & brute force)
+  auth: createLimiter({
+    burstLimit: 2,
+    burstWindowMs: 3000,
+    sustainedLimit: 6,
+    sustainedWindowMs: 60000,
+    ipOnly: true
+  }),
+
+  // Power Actions (Start/Stop/Restart/Kill - Choke server command flooding)
+  power: createLimiter({
+    burstLimit: 2,
+    burstWindowMs: 4000,
+    sustainedLimit: 15,
+    sustainedWindowMs: 60000
+  }),
+
+  // File Explorer Actions (Differentiate fast file browsing from API abuse)
+  file: createLimiter({
+    burstLimit: 20,
+    burstWindowMs: 2000,
+    sustainedLimit: 200,
+    sustainedWindowMs: 60000
+  }),
+
+  // Database Backups (Heaviest compression load, strict limits)
+  backup: createLimiter({
+    burstLimit: 1,
+    burstWindowMs: 5000,
+    sustainedLimit: 5,
+    sustainedWindowMs: 60000
+  })
 };
