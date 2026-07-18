@@ -90,15 +90,36 @@ function initDatabase() {
     );
   `);
 
-  // Nodes table
+  // Nodes table — full configuration like Pterodactyl
   db.exec(`
     CREATE TABLE IF NOT EXISTS nodes (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      name        TEXT    NOT NULL,
-      ip          TEXT    NOT NULL,
-      port        INTEGER NOT NULL DEFAULT 9900,
-      token       TEXT    NOT NULL,
-      created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+      id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+      name                  TEXT    NOT NULL,
+      description           TEXT    DEFAULT '',
+      location              TEXT    DEFAULT '',
+      ip                    TEXT    NOT NULL,
+      port                  INTEGER NOT NULL DEFAULT 9900,
+      token                 TEXT    NOT NULL,
+      -- Resource Limits
+      memory_limit          INTEGER DEFAULT 0,
+      memory_overalloc      INTEGER DEFAULT 0,
+      disk_limit            INTEGER DEFAULT 0,
+      disk_overalloc        INTEGER DEFAULT 0,
+      cpu_limit             INTEGER DEFAULT 0,
+      max_servers           INTEGER DEFAULT 0,
+      -- Network & Proxy
+      use_ssl               INTEGER DEFAULT 0,
+      behind_proxy          INTEGER DEFAULT 0,
+      public_host           TEXT    DEFAULT '',
+      -- Upload & User Quota
+      upload_limit_mb       INTEGER DEFAULT 100,
+      user_file_quota_kb    INTEGER DEFAULT 1024,
+      -- Maintenance
+      maintenance_mode      INTEGER DEFAULT 0,
+      maintenance_msg       TEXT    DEFAULT 'This node is currently under maintenance.',
+      -- Tags
+      tags                  TEXT    DEFAULT '',
+      created_at            TEXT    NOT NULL DEFAULT (datetime('now'))
     );
   `);
 
@@ -184,14 +205,32 @@ function initDatabase() {
   }
 
   // Migration: install_cmd
-  try {
-    db.exec("ALTER TABLE apps ADD COLUMN install_cmd TEXT DEFAULT '';");
-  } catch (_) {}
-
+  try { db.exec("ALTER TABLE apps ADD COLUMN install_cmd TEXT DEFAULT '';"); } catch (_) {}
   // Migration: node_id
-  try {
-    db.exec("ALTER TABLE apps ADD COLUMN node_id INTEGER DEFAULT 1;");
-  } catch (_) {}
+  try { db.exec("ALTER TABLE apps ADD COLUMN node_id INTEGER DEFAULT 1;"); } catch (_) {}
+
+  // Migrations: nodes table new columns (safe — won't fail if already exists)
+  const nodeMigrations = [
+    "ALTER TABLE nodes ADD COLUMN description TEXT DEFAULT '';",
+    "ALTER TABLE nodes ADD COLUMN location TEXT DEFAULT '';",
+    "ALTER TABLE nodes ADD COLUMN memory_limit INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN memory_overalloc INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN disk_limit INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN disk_overalloc INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN cpu_limit INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN max_servers INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN use_ssl INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN behind_proxy INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN public_host TEXT DEFAULT '';",
+    "ALTER TABLE nodes ADD COLUMN upload_limit_mb INTEGER DEFAULT 100;",
+    "ALTER TABLE nodes ADD COLUMN user_file_quota_kb INTEGER DEFAULT 1024;",
+    "ALTER TABLE nodes ADD COLUMN maintenance_mode INTEGER DEFAULT 0;",
+    "ALTER TABLE nodes ADD COLUMN maintenance_msg TEXT DEFAULT 'This node is currently under maintenance.';",
+    "ALTER TABLE nodes ADD COLUMN tags TEXT DEFAULT '';"
+  ];
+  for (const sql of nodeMigrations) {
+    try { db.exec(sql); } catch (_) {}
+  }
 
   console.log(`✅ Database: ${DB_PATH}`);
 }
