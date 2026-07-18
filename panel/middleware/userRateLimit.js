@@ -53,11 +53,6 @@ function createLimiter(options = {}) {
       return res.status(403).json({ error: 'Automated requests are not permitted.' });
     }
 
-    // ── 2. Admin bypass ─────────────────────────────────────
-    if (!ipOnly && req.user && req.user.role === 'admin') {
-      return next();
-    }
-
     const id  = (ipOnly || !req.user) ? (req.ip || 'unknown') : String(req.user.id);
     const now = Date.now();
 
@@ -152,11 +147,10 @@ module.exports = {
   }),
 
   // General API (dashboard, status, listing)
-  // Human browsing: comfortably 5-8 clicks per 2s
   general: createLimiter({
-    burstLimit: 8,
+    burstLimit: 4,
     burstWindowMs: 2000,
-    sustainedLimit: 80,
+    sustainedLimit: 60,
     sustainedWindowMs: 60000
   }),
 

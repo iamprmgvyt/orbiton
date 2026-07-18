@@ -45,6 +45,17 @@ export async function api(endpoint, method = 'GET', body = null) {
 
   const response = await fetch(`${BASE_URL}${endpoint}`, options);
 
+  if (response.status === 429) {
+    const data = await response.json();
+    window.dispatchEvent(new CustomEvent('api-rate-limited', {
+      detail: {
+        message: data.error || 'Too many requests. Please slow down.',
+        retryAfter: parseInt(response.headers.get('Retry-After') || '5')
+      }
+    }));
+    throw new Error(data.error || 'Rate limited');
+  }
+
   if (response.status === 401) {
     removeToken();
     localStorage.removeItem('user');

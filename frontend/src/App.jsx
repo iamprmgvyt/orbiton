@@ -13,6 +13,7 @@ import Settings from './pages/Settings';
 import Nodes from './pages/Nodes';
 import CreateNewApp from './pages/CreateNewApp';
 import { getToken, getUser, removeToken } from './utils/api';
+import { ShieldAlert } from 'lucide-react';
 
 export default function App() {
   const [user, setUserState] = useState(null);
@@ -21,6 +22,7 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('orbiton_theme') || 'theme-cyberpunk');
+  const [rateLimitNotice, setRateLimitNotice] = useState(null);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -30,6 +32,14 @@ export default function App() {
     root.classList.add(theme);
     localStorage.setItem('orbiton_theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const handleRateLimit = (e) => {
+      setRateLimitNotice(e.detail);
+    };
+    window.addEventListener('api-rate-limited', handleRateLimit);
+    return () => window.removeEventListener('api-rate-limited', handleRateLimit);
+  }, []);
 
   // AppDetail state
   const [selectedAppId, setSelectedAppId] = useState(null);
@@ -182,6 +192,53 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {rateLimitNotice && (
+        <RateLimitToast
+          message={rateLimitNotice.message}
+          retryAfter={rateLimitNotice.retryAfter}
+          onClose={() => setRateLimitNotice(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Rate Limit Countdown Toast Component ─────────────────────
+function RateLimitToast({ message, retryAfter, onClose }) {
+  const [timeLeft, setTimeLeft] = useState(retryAfter);
+
+  useEffect(() => {
+    setTimeLeft(retryAfter);
+  }, [retryAfter]);
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      onClose();
+      return;
+    }
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft, onClose]);
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[9999] max-w-sm w-full bg-red-500/10 backdrop-blur-md border border-red-500/35 p-4 rounded-2xl shadow-2xl flex gap-3 animate-pulse-once">
+      <div className="w-10 h-10 rounded-xl bg-red-500/25 flex items-center justify-center text-red-500 shrink-0">
+        <ShieldAlert className="w-5 h-5 animate-bounce" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4 className="text-sm font-bold text-red-400">Security Guard Active</h4>
+        <p className="text-xs text-text2 mt-1 leading-relaxed">{message}</p>
+        <div className="mt-2.5 flex items-center justify-between">
+          <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Spam lock:</span>
+          <span className="text-xs font-mono font-bold text-red-400 bg-red-500/10 px-2 py-0.5 rounded-lg border border-red-500/20">
+            {timeLeft}s remaining
+          </span>
+        </div>
+      </div>
+      <button onClick={onClose} className="text-muted hover:text-text align-top font-bold text-lg leading-none h-4">&times;</button>
     </div>
   );
 }
