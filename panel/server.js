@@ -37,23 +37,27 @@ const KEY_FILE  = path.join(CERT_DIR, 'privkey.pem');
 
 app.set('trust proxy', 1);
 
+const hasSSLForHelmet = process.env.DISABLE_SSL !== 'true' &&
+  require('fs').existsSync(path.join(__dirname, '..', 'certs', 'fullchain.pem'));
+
 app.use(helmet({
-  contentSecurityPolicy: {
+  contentSecurityPolicy: hasSSLForHelmet ? {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https://*"],
-      connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"]
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https:"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"],
+      workerSrc: ["'self'", "blob:"]
     }
-  },
+  } : false,  // Disable CSP on plain HTTP to avoid blocking frontend assets
   crossOriginEmbedderPolicy: false,
-  hsts: {
+  hsts: hasSSLForHelmet ? {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
-  }
+  } : false   // Never send HSTS over plain HTTP
 }));
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
