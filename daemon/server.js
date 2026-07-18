@@ -380,7 +380,6 @@ app.get('/api/system/metrics-history', (req, res) => {
 
 // ─── System telemetry endpoints ───────────────────────────────
 app.get('/api/system/stats', async (req, res) => {
-  // Standalone CPU/RAM metrics calculation
   const totalMem = os.totalmem();
   const freeMem  = os.freemem();
   const usedMem  = totalMem - freeMem;
@@ -389,18 +388,35 @@ app.get('/api/system/stats', async (req, res) => {
   const cpus = os.cpus();
   const load = os.loadavg();
 
+  // ── Auto-detect real disk size via df ────────────────────────
+  let diskInfo = [{ usedPercent: 0, used: 0, size: 0 }];
+  try {
+    const { execSync } = require('child_process');
+    if (process.platform === 'linux' || process.platform === 'darwin') {
+      // df -k returns KB units: total, used, available, mount
+      const dfOut = execSync("df -k / | awk 'NR==2 {print $2, $3, $4}'", { stdio: 'pipe' }).toString().trim();
+      const [totalKB, usedKB] = dfOut.split(' ').map(Number);
+      if (totalKB > 0) {
+        diskInfo = [{
+          usedPercent: Math.round((usedKB / totalKB) * 100),
+          used: usedKB * 1024,
+          size: totalKB * 1024
+        }];
+      }
+    }
+  } catch (_) {
+    // Fallback: estimate based on available file system info
+    diskInfo = [{ usedPercent: 0, used: 0, size: 0, error: 'disk_unavailable' }];
+  }
+
   res.json({
     cpu: {
-      usage: Math.round(load[0] * 100 / cpus.length),
+      usage: Math.min(Math.round(load[0] * 100 / cpus.length), 100),
       model: cpus[0]?.model || 'N/A',
       cores: cpus.length,
       load
     },
-    memory: {
-      total: totalMem,
-      used: usedMem,
-      usedPercent
-    },
+    memory: { total: totalMem, used: usedMem, usedPercent },
     os: {
       distro: os.type(),
       release: os.release(),
@@ -408,7 +424,7 @@ app.get('/api/system/stats', async (req, res) => {
       arch: os.arch(),
       uptime: os.uptime()
     },
-    disk: [{ usedPercent: 10, used: 10 * 1024 * 1024 * 1024, size: 100 * 1024 * 1024 * 1024 }] // fallback placeholder
+    disk: diskInfo
   });
 });
 

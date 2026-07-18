@@ -11,12 +11,18 @@ const { daemonRequest, DAEMON_URL, DAEMON_TOKEN } = require('../utils/daemonApi'
 const router = express.Router();
 const { checkPermission } = require('../middleware/permission');
 
+// ─── Per-user file quota ───────────────────────────────────────
+// Admin: unlimited | Regular user: 1MB per file upload
+const USER_FILE_QUOTA = parseInt(process.env.USER_FILE_QUOTA_MB || '1') * 1024 * 1024; // default 1MB
+
 // Apply files scope validation middleware to all routes containing :appId
 router.use('/:appId', checkPermission('files'));
 
 const upload = multer({
   dest: require('os').tmpdir(),
-  limits: { fileSize: 500 * 1024 * 1024 }
+  limits: {
+    fileSize: 100 * 1024 * 1024  // multer hard-cap at 100MB; enforced further per role below
+  }
 });
 
 function checkAppAccess(req, res, appId) {
@@ -132,6 +138,20 @@ router.post('/:appId/extract', async (req, res) => {
 router.post('/:appId/upload', upload.array('files', 50), async (req, res) => {
   const app = checkAppAccess(req, res, req.params.appId);
   if (!app) return;
+
+  // ── Per-user quota check ─────────────────────────────────────
+  if (req.user.role !== 'admin') {
+    const oversized = (req.files || []).filter(f => f.size > USER_FILE_QUOTA);
+    if (oversized.length > 0) {
+      // Cleanup temp files
+      for (const f of req.files) fs.unlink(f.path, () => {});
+      const limit = (USER_FILE_QUOTA / 1024).toFixed(0);
+      return res.status(413).json({
+        error: `File size limit exceeded. Each file must be under ${limit}KB (${(USER_FILE_QUOTA / 1024 / 1024).toFixed(1)}MB) per user quota. Contact your administrator to upload larger files.`
+      });
+    }
+  }
+
   try {
     const fd = new globalThis.FormData();
     for (const f of req.files) {
@@ -154,9 +174,7 @@ router.post('/:appId/upload', upload.array('files', 50), async (req, res) => {
     const fetch = globalThis.fetch;
     const resDaemon = await fetch(`${targetUrl}/api/files/${req.params.appId}/upload?path=${encodeURIComponent(req.query.path || '/')}`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${targetToken}`
-      },
+      headers: { 'Authorization': `Bearer ${targetToken}` },
       body: fd
     });
     const data = await resDaemon.json();
