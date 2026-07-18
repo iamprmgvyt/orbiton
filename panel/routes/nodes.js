@@ -75,6 +75,7 @@ router.get('/', async (req, res) => {
         cpuUsage,
         totalMem,
         usedMem,
+        freeMem: totalMem - usedMem,
         diskUsed,
         diskTotal,
         uptime
