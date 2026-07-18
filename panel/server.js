@@ -21,6 +21,7 @@ const systemRoutes = require('./routes/system');
 const { setupSocketHandlers } = require('./managers/terminalManager');
 const authMiddleware = require('./middleware/auth');
 const userRateLimit = require('./middleware/userRateLimit');
+const requestGuard  = require('./middleware/requestGuard');
 
 const app = express();
 
@@ -37,16 +38,54 @@ const KEY_FILE  = path.join(CERT_DIR, 'privkey.pem');
 app.set('trust proxy', 1);
 
 app.use(helmet({
-  contentSecurityPolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https://*"],
+      connectSrc: ["'self'", "wss:", "ws:", "https:", "http:"]
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 
-app.use(cors({ origin: '*' }));
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rate limiting
-app.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 2000 }));
-app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 30 }));
+// ─── Security Guard (runs before all routes) ──────────────────
+app.use(requestGuard);
+
+// ─── Additional Security Headers ─────────────────────────────
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// ─── Global IP Rate Limit (fallback) ─────────────────────────
+app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 300 }));
+app.use('/api/auth/login', rateLimit({ windowMs: 60 * 1000, max: 5 }));
 
 // ─── Static Files ─────────────────────────────────────────────
 app.use(express.static(FRONTEND));
@@ -79,7 +118,19 @@ const httpServer = http.createServer(app);
 const hasSSL     = process.env.DISABLE_SSL !== 'true' && fs.existsSync(CERT_FILE) && fs.existsSync(KEY_FILE);
 let   io, primaryServer;
 
-const ioOptions = { cors: { origin: '*' }, maxHttpBufferSize: 1e8 };
+const ioOptions = {
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ["GET", "POST"]
+  },
+  maxHttpBufferSize: 1e8
+};
 
 function printBanner(port, ssl = false) {
   const logo = `

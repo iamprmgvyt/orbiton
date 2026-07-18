@@ -28,7 +28,16 @@ const PORT = parseInt(process.env.PORT || '9900');
 const DAEMON_TOKEN = process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123';
 
 app.use(helmet());
-app.use(cors({ origin: '*' }));
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
@@ -736,7 +745,18 @@ app.post('/api/apps/:appId/logs/clear', (req, res) => {
 });
 
 // ─── Socket.IO WebSockets ─────────────────────────────────────
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, {
+  cors: {
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ["GET", "POST"]
+  }
+});
 processManager.setIO(io);
 
 // Socket.io Authorization Token Check
