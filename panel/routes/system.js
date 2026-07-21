@@ -1,6 +1,6 @@
 // ============================================================
 // Orbiton Panel - System Routes (Proxy to Daemon Node)
-// Dispatching telemetry requests to daemons.
+// Dispatching telemetry requests to specific daemon host nodes.
 // ============================================================
 const express  = require('express');
 const { daemonRequest } = require('../utils/daemonApi');
@@ -17,8 +17,9 @@ router.use((req, res, next) => {
 
 // GET /api/system/metrics-history
 router.get('/metrics-history', async (req, res) => {
+  const nodeId = parseInt(req.query.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/metrics-history');
+    const data = await daemonRequest('/api/system/metrics-history', 'GET', null, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -27,8 +28,9 @@ router.get('/metrics-history', async (req, res) => {
 
 // GET /api/system/stats
 router.get('/stats', async (req, res) => {
+  const nodeId = parseInt(req.query.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/stats');
+    const data = await daemonRequest('/api/system/stats', 'GET', null, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -37,8 +39,9 @@ router.get('/stats', async (req, res) => {
 
 // GET /api/system/runtimes
 router.get('/runtimes', async (req, res) => {
+  const nodeId = parseInt(req.query.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/runtimes');
+    const data = await daemonRequest('/api/system/runtimes', 'GET', null, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -47,8 +50,9 @@ router.get('/runtimes', async (req, res) => {
 
 // GET /api/system/processes
 router.get('/processes', async (req, res) => {
+  const nodeId = parseInt(req.query.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/processes');
+    const data = await daemonRequest('/api/system/processes', 'GET', null, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -57,32 +61,36 @@ router.get('/processes', async (req, res) => {
 
 // GET /api/system/firewall
 router.get('/firewall', async (req, res) => {
+  const nodeId = parseInt(req.query.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/firewall');
+    const data = await daemonRequest('/api/system/firewall', 'GET', null, nodeId);
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /api/system/firewall/open
 router.post('/firewall/open', async (req, res) => {
+  const nodeId = parseInt(req.body.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/firewall/open', 'POST', req.body);
+    const data = await daemonRequest('/api/system/firewall/open', 'POST', req.body, nodeId);
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /api/system/firewall/close
 router.post('/firewall/close', async (req, res) => {
+  const nodeId = parseInt(req.body.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/firewall/close', 'POST', req.body);
+    const data = await daemonRequest('/api/system/firewall/close', 'POST', req.body, nodeId);
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // POST /api/system/runtimes/install
 router.post('/runtimes/install', async (req, res) => {
+  const nodeId = parseInt(req.body.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/runtimes/install', 'POST', req.body);
+    const data = await daemonRequest('/api/system/runtimes/install', 'POST', req.body, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -91,8 +99,9 @@ router.post('/runtimes/install', async (req, res) => {
 
 // GET /api/system/runtimes/install/log
 router.get('/runtimes/install/log', async (req, res) => {
+  const nodeId = parseInt(req.query.nodeId || '1');
   try {
-    const data = await daemonRequest(`/api/system/runtimes/install/log?runtime=${req.query.runtime}`);
+    const data = await daemonRequest(`/api/system/runtimes/install/log?runtime=${req.query.runtime}`, 'GET', null, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -101,8 +110,9 @@ router.get('/runtimes/install/log', async (req, res) => {
 
 // POST /api/system/runtimes/uninstall
 router.post('/runtimes/uninstall', async (req, res) => {
+  const nodeId = parseInt(req.body.nodeId || '1');
   try {
-    const data = await daemonRequest('/api/system/runtimes/uninstall', 'POST', req.body);
+    const data = await daemonRequest('/api/system/runtimes/uninstall', 'POST', req.body, nodeId);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });

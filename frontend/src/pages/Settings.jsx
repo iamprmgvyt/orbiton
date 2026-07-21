@@ -28,6 +28,8 @@ export default function Settings({ theme, setTheme }) {
   const [newPort, setNewPort] = useState('');
   const [newProtocol, setNewProtocol] = useState('tcp');
   const [fwActionLoading, setFwActionLoading] = useState(false);
+  const [nodes, setNodes] = useState([]);
+  const [selectedNodeId, setSelectedNodeId] = useState(1);
 
   // Audit Logs states
   const [auditLogs, setAuditLogs] = useState([]);
@@ -45,15 +47,18 @@ export default function Settings({ theme, setTheme }) {
     { id: 'theme-nordic', name: 'Nordic Light', bg: '#f8fafc', accent: '#6d28d9', text: '#0f172a', desc: 'Modern and clean Light Mode with slate contrast.' },
   ];
 
-  const loadFirewall = async () => {
+  const loadFirewall = async (nodeId) => {
     if (!isAdmin) return;
     setFwLoading(true);
+    const targetNodeId = nodeId || selectedNodeId;
     try {
-      const data = await api('/system/firewall');
+      const data = await api(`/system/firewall?nodeId=${targetNodeId}`);
       setFwActive(data.active);
       setFwRules(data.rules || []);
     } catch (err) {
       console.error(err);
+      setFwActive(false);
+      setFwRules([]);
     } finally {
       setFwLoading(false);
     }
@@ -73,7 +78,16 @@ export default function Settings({ theme, setTheme }) {
   };
 
   useEffect(() => {
-    if (activeTab === 'firewall') loadFirewall();
+    if (activeTab === 'firewall') {
+      api('/nodes').then(data => {
+        setNodes(data || []);
+        if (data && data.length > 0) {
+          const defaultNode = data.find(n => n.status === 'online') || data[0];
+          setSelectedNodeId(defaultNode.id);
+          loadFirewall(defaultNode.id);
+        }
+      }).catch(err => console.error(err));
+    }
     if (activeTab === 'audit') loadAuditLogs();
   }, [activeTab]);
 
@@ -109,9 +123,9 @@ export default function Settings({ theme, setTheme }) {
     }
     setFwActionLoading(true);
     try {
-      await api('/system/firewall/open', 'POST', { port: portNum, protocol: newProtocol });
+      await api('/system/firewall/open', 'POST', { port: portNum, protocol: newProtocol, nodeId: selectedNodeId });
       setNewPort('');
-      loadFirewall();
+      loadFirewall(selectedNodeId);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -123,8 +137,8 @@ export default function Settings({ theme, setTheme }) {
     if (!confirm(`Are you sure you want to close port ${port}/${protocol}?`)) return;
     setFwActionLoading(true);
     try {
-      await api('/system/firewall/close', 'POST', { port, protocol });
-      loadFirewall();
+      await api('/system/firewall/close', 'POST', { port, protocol, nodeId: selectedNodeId });
+      loadFirewall(selectedNodeId);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -306,7 +320,38 @@ export default function Settings({ theme, setTheme }) {
 
       {/* Firewall tab */}
       {activeTab === 'firewall' && isAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="space-y-6 w-full">
+          {/* Node Selector Row */}
+          {nodes.length > 1 && (
+            <div className="bg-surface border border-border rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-text">Select Host VPS Node</h4>
+                  <p className="text-[10px] text-muted">Select which VPS host node you want to view or open firewall ports on.</p>
+                </div>
+              </div>
+              <select
+                value={selectedNodeId}
+                onChange={(e) => {
+                  const id = parseInt(e.target.value);
+                  setSelectedNodeId(id);
+                  loadFirewall(id);
+                }}
+                className="bg-bg border border-border text-text rounded-xl px-4 py-2.5 text-xs font-semibold outline-none focus:border-accent min-w-[220px] cursor-pointer"
+              >
+                {nodes.map(n => (
+                  <option key={n.id} value={n.id}>
+                    {n.name} ({n.ip} - {n.status.toUpperCase()})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Form and info */}
           <div className="md:col-span-1 space-y-6">
             <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
@@ -433,7 +478,8 @@ export default function Settings({ theme, setTheme }) {
             )}
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* Audit Logs tab */}
       {activeTab === 'audit' && isAdmin && (
