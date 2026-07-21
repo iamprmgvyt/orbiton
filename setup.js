@@ -74,7 +74,7 @@ function configureFail2ban() {
 
     if (hasFail2ban) {
       // 1. Create filter
-      const filterContent = `[Definition]\nfailregex = ^\\[.*\\] \\[Orbiton-Security\\] \\[(?:RATE_LIMIT_STRIKE|LOGIN_FAILED)\\] IP=<ADDR> .*\nignoreregex =\n`;
+      const filterContent = `[Definition]\nfailregex = ^\\[.*\\] \\[Orbiton-Security\\] \\[(?:RATE_LIMIT_STRIKE|RATE_LIMIT_SUSTAINED|LOGIN_FAILED)\\] IP=<ADDR> .*\nignoreregex =\n`;
       fs.writeFileSync('/etc/fail2ban/filter.d/orbiton.conf', filterContent);
 
       // 2. Create jail config

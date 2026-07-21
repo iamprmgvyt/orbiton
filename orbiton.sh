@@ -147,7 +147,7 @@ case "$1" in
     echo -e "${YELLOW}Creating Fail2ban filter rules for Orbiton logs...${NC}"
     cat << 'EOF' > /etc/fail2ban/filter.d/orbiton.conf
 [Definition]
-failregex = ^\[.*\] \[Orbiton-Security\] \[(?:RATE_LIMIT_STRIKE|LOGIN_FAILED)\] IP=<ADDR> .*
+failregex = ^\[.*\] \[Orbiton-Security\] \[(?:RATE_LIMIT_STRIKE|RATE_LIMIT_SUSTAINED|LOGIN_FAILED)\] IP=<ADDR> .*
 ignoreregex =
 EOF
 
@@ -180,7 +180,7 @@ EOF
     echo -e "  - Status check:   ${BOLD}fail2ban-client status orbiton${NC}"
     ;;
   version)
-    echo -e "Orbiton Orchestrator v1.30.0"
+    echo -e "Orbiton Orchestrator v1.31.0"
     ;;
   *)
     show_help

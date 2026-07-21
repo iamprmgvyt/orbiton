@@ -218,10 +218,9 @@ configure_fail2ban_auto() {
   fi
 
   if command -v fail2ban-client &>/dev/null; then
-    # 1. Create Orbiton filter
     cat << 'EOF' > /etc/fail2ban/filter.d/orbiton.conf
 [Definition]
-failregex = ^\[.*\] \[Orbiton-Security\] \[(?:RATE_LIMIT_STRIKE|LOGIN_FAILED)\] IP=<ADDR> .*
+failregex = ^\[.*\] \[Orbiton-Security\] \[(?:RATE_LIMIT_STRIKE|RATE_LIMIT_SUSTAINED|LOGIN_FAILED)\] IP=<ADDR> .*
 ignoreregex =
 EOF
 

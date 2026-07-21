@@ -23,6 +23,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('orbiton_theme') || 'theme-cyberpunk');
   const [rateLimitNotice, setRateLimitNotice] = useState(null);
+  const [rateLimitUntil, setRateLimitUntil] = useState(parseInt(localStorage.getItem('rateLimitUntil') || '0', 10));
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -35,6 +36,9 @@ export default function App() {
 
   useEffect(() => {
     const handleRateLimit = (e) => {
+      const until = Date.now() + e.detail.retryAfter * 1000;
+      localStorage.setItem('rateLimitUntil', until);
+      setRateLimitUntil(until);
       setRateLimitNotice(e.detail);
     };
     window.addEventListener('api-rate-limited', handleRateLimit);
@@ -124,6 +128,23 @@ export default function App() {
       <div className="min-h-screen bg-bg flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
       </div>
+    );
+  }
+
+  const now = Date.now();
+  const isRateLimited = rateLimitUntil > now;
+
+  if (isRateLimited) {
+    return (
+      <RateLimitBlockPage
+        message={rateLimitNotice?.message || 'Too many requests. Please wait for the cooldown to finish.'}
+        until={rateLimitUntil}
+        onExpired={() => {
+          localStorage.removeItem('rateLimitUntil');
+          setRateLimitUntil(0);
+          setRateLimitNotice(null);
+        }}
+      />
     );
   }
 
@@ -239,6 +260,59 @@ function RateLimitToast({ message, retryAfter, onClose }) {
         </div>
       </div>
       <button onClick={onClose} className="text-muted hover:text-text align-top font-bold text-lg leading-none h-4">&times;</button>
+    </div>
+  );
+}
+
+// ─── Rate Limit Block Page Component ──────────────────────────
+function RateLimitBlockPage({ message, until, onExpired }) {
+  const [timeLeft, setTimeLeft] = useState(Math.ceil((until - Date.now()) / 1000));
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const remaining = Math.ceil((until - Date.now()) / 1000);
+      if (remaining <= 0) {
+        clearInterval(timer);
+        onExpired();
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 200);
+    return () => clearInterval(timer);
+  }, [until, onExpired]);
+
+  return (
+    <div className="min-h-screen w-full bg-[#030307] flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Decorative Glowing Orbs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-500/10 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-[120px] pointer-events-none animate-pulse"></div>
+
+      <div className="max-w-md w-full bg-[#0b0b16]/60 backdrop-blur-xl border border-red-500/20 p-8 rounded-3xl shadow-2xl text-center relative z-10 flex flex-col items-center space-y-6">
+        <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 shadow-lg shadow-red-500/5">
+          <ShieldAlert className="w-8 h-8 animate-bounce" />
+        </div>
+        
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-text">Security Shield Engaged</h2>
+          <p className="text-xs text-muted uppercase font-mono tracking-wider">Access Temporarily Suspended</p>
+        </div>
+
+        <p className="text-sm text-text2 leading-relaxed">
+          {message || 'You have sent too many requests in a short period. Access has been restricted to protect VPS system resources.'}
+        </p>
+
+        <div className="w-full bg-[#030307]/60 border border-border/60 rounded-2xl p-6 flex flex-col items-center justify-center space-y-2">
+          <span className="text-[10px] text-muted uppercase font-bold tracking-wider">Cooldown Period Remaining</span>
+          <span className="text-4xl font-mono font-bold text-red-400">
+            {timeLeft > 0 ? timeLeft : 0}s
+          </span>
+        </div>
+
+        <div className="text-[10px] text-muted font-mono leading-relaxed">
+          Please wait. Access will automatically restore once the timer expires.<br/>
+          Spamming or refreshing will not bypass this guard.
+        </div>
+      </div>
     </div>
   );
 }
