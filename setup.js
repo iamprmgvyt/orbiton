@@ -160,7 +160,7 @@ WantedBy=multi-user.target
   }
 }
 
-async function installPanel(allInOneSecret = null) {
+async function installPanel(allInOneSecret = null, defaultDaemonPort = 9900) {
   console.log(`\n${colors.cyan}🛠️  Installing Dependencies for Orbiton Panel...${colors.reset}`);
   runCmd('npm install --omit=dev', path.join(__dirname, 'panel'));
 
@@ -182,12 +182,23 @@ async function installPanel(allInOneSecret = null) {
   const jwtSecret = crypto.randomBytes(32).toString('hex');
   const daemonToken = allInOneSecret || `orbiton_daemon_secret_${crypto.randomBytes(16).toString('hex')}`;
 
+  let daemonUrl = `http://localhost:${defaultDaemonPort}`;
+  if (!allInOneSecret) {
+    const dUrlInput = await askQuestion(`\n* Enter Daemon URL (where Wings agent runs) [Default: http://localhost:9900]: `);
+    if (dUrlInput.trim()) {
+      daemonUrl = dUrlInput.trim();
+      if (!daemonUrl.startsWith('http://') && !daemonUrl.startsWith('https://')) {
+        daemonUrl = `http://${daemonUrl}`;
+      }
+    }
+  }
+
   const envContent = `PORT=${port}
 SSL_PORT=3443
 JWT_SECRET=${jwtSecret}
 NODE_ENV=production
 DISABLE_SSL=true
-DAEMON_URL=http://localhost:9900
+DAEMON_URL=${daemonUrl}
 DAEMON_TOKEN=${daemonToken}
 `;
 
@@ -200,7 +211,7 @@ DAEMON_TOKEN=${daemonToken}
   return { port, daemonToken };
 }
 
-async function installDaemon(allInOneSecret = null) {
+async function installDaemon(allInOneSecret = null, daemonPort = 9900) {
   console.log(`\n${colors.cyan}🛠️  Installing Dependencies for Orbiton Daemon (Wings Agent)...${colors.reset}`);
   const daemonCwd = path.join(__dirname, 'daemon');
   runCmd('npm install --omit=dev', daemonCwd);
@@ -220,7 +231,7 @@ async function installDaemon(allInOneSecret = null) {
     ? path.join(process.env.APPDATA || require('os').homedir(), 'orbiton-data')
     : '/opt/orbiton-data';
 
-  const envContent = `PORT=9900
+  const envContent = `PORT=${daemonPort}
 DAEMON_TOKEN=${daemonToken}
 DATA_DIR=${defaultDataDir.replace(/\\/g, '/')}
 `;
@@ -249,18 +260,27 @@ async function main() {
 
   const allInOneSecret = (selection === 0) ? `orbiton_daemon_secret_${crypto.randomBytes(16).toString('hex')}` : null;
   let panelPort = 3000;
+  let daemonPort = 9900;
+
+  if (selection === 0 || selection === 2) {
+    console.log(`\n${colors.yellow}* Configure Daemon Network Port:${colors.reset}`);
+    const dPortInput = await askQuestion('  Enter Daemon Port [Default: 9900]: ');
+    if (dPortInput.trim()) {
+      daemonPort = parseInt(dPortInput.trim(), 10) || 9900;
+    }
+  }
 
   if (selection === 0) {
-    const panelConfig = await installPanel(allInOneSecret);
+    const panelConfig = await installPanel(allInOneSecret, daemonPort);
     panelPort = panelConfig.port;
-    await installDaemon(allInOneSecret);
+    await installDaemon(allInOneSecret, daemonPort);
     writeSystemdServices(panelPort);
   } else if (selection === 1) {
     const panelConfig = await installPanel();
     panelPort = panelConfig.port;
     writeSystemdServices(panelPort);
   } else if (selection === 2) {
-    await installDaemon();
+    await installDaemon(null, daemonPort);
     writeSystemdServices(panelPort);
   } else {
     console.log(`${colors.red}Invalid selection. Exiting.${colors.reset}`);
@@ -291,7 +311,7 @@ async function main() {
 
     if (selection === 0 || selection === 1) {
       console.log(`${colors.cyan}[System] Spawning Panel process on port ${panelPort}...${colors.reset}`);
-      const panelProc = spawn('node', ['server.js'], { cwd: path.join(__dirname, 'panel'), shell: true });
+      const panelProc = spawn('node', ['server.js'], { cwd: path.join(__dirname, 'panel') });
       panelProc.stdout.on('data', (data) => {
         process.stdout.write(`${colors.blue}[Panel]${colors.reset} ${data.toString()}`);
       });
@@ -302,8 +322,8 @@ async function main() {
     }
 
     if (selection === 0 || selection === 2) {
-      console.log(`${colors.cyan}[System] Spawning Daemon process on port 9900...${colors.reset}`);
-      const daemonProc = spawn('node', ['server.js'], { cwd: path.join(__dirname, 'daemon'), shell: true });
+      console.log(`${colors.cyan}[System] Spawning Daemon process on port ${daemonPort}...${colors.reset}`);
+      const daemonProc = spawn('node', ['server.js'], { cwd: path.join(__dirname, 'daemon') });
       daemonProc.stdout.on('data', (data) => {
         process.stdout.write(`${colors.yellow}[Daemon]${colors.reset} ${data.toString()}`);
       });
