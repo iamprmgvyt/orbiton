@@ -51,7 +51,7 @@ graph TD
 
 * **🚀 App Orchestrator:** Full life-cycle controls (Start, Stop, Restart, Force Kill) for compile runtimes or Docker containers.
 * **⌨️ Pterodactyl-style Console:** Fully functional TTY shell with terminal memory history buffer and live stream logging.
-* **🛡️ Security Shield:** Automated random SQLite JWT generation and individual secure Master Tokens between nodes.
+* **🛡️ Security Shield:** Dual failed-login lockout (IP + User), progressive slow-down response delay, and automatic Fail2ban firewall integration.
 * **🔧 Port Firewall Manager:** Open, close, and monitor system ports directly from the Settings panel utilizing automated UFW rules.
 * **📂 Embedded File Manager:** Full browser-based workspace file explorer (Create, Edit, Delete, Upload, Download, Zip/Unzip) for host folders.
 
@@ -84,12 +84,13 @@ sudo bash install.sh
 ```
 
 **Installer Options Menu:**
-* **`[0]` All-in-One:** Installs both Web Panel and Daemon Node on the same machine.
-* **`[1]` Web Panel:** Installs only the Master UI and database.
-* **`[2]` Daemon Node:** Installs only the Wings daemon on target worker servers.
-* **`[3]` Configure Let's Encrypt:** Set up HTTPS SSL configuration for your panel domain.
-* **`[4]` Uninstall:** Purges Orbiton and all systemd daemons.
-* **`[5]` Update Orbiton:** Pulls the latest version from GitHub, rebuilds dependencies, and restarts services.
+* **`[0]` All-in-One:** Installs both Web Panel and Daemon Node on the same machine *(Auto-configures Fail2ban Shield!)*.
+* **`[1]` Web Panel:** Installs only the Master UI and database *(Auto-configures Fail2ban Shield!)*.
+* **`[2]` Daemon Node:** Installs only the Wings daemon on target worker VPS hosts.
+* **`[3]` Configure Let's Encrypt:** Set up HTTPS SSL certificate for your panel domain.
+* **`[4]` Configure Fail2ban:** Enable/install Fail2ban DDoS and brute-force protection shield.
+* **`[5]` Uninstall:** Purges Orbiton and all systemd service daemons.
+* **`[6]` Update Orbiton:** Pulls the latest version from GitHub, rebuilds dependencies, and restarts services.
 
 ### 🪐 Orbiton Global Command Line Interface (CLI)
 
@@ -110,6 +111,9 @@ sudo orbiton logs
 
 # Check service daemon health status
 sudo orbiton status
+
+# Configure Fail2ban DDoS/brute-force IP ban shield manually
+sudo orbiton fail2ban
 
 # Trigger auto-update from GitHub
 sudo orbiton update

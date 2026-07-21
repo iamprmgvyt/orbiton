@@ -209,6 +209,48 @@ letsencrypt_ssl() {
   fi
 }
 
+configure_fail2ban_auto() {
+  echo -e "\n${YELLOW}🛡️ Auto-configuring Fail2ban Shield for Panel logs...${NC}"
+  if ! command -v fail2ban-client &>/dev/null; then
+    echo -e "${YELLOW}Installing Fail2ban...${NC}"
+    apt-get update -qq >> $LOG_PATH 2>&1
+    apt-get install -y fail2ban >> $LOG_PATH 2>&1 || echo -e "${YELLOW}  ⚠ Skipping Fail2ban installation${NC}"
+  fi
+
+  if command -v fail2ban-client &>/dev/null; then
+    # 1. Create Orbiton filter
+    cat << 'EOF' > /etc/fail2ban/filter.d/orbiton.conf
+[Definition]
+failregex = ^\[.*\] \[Orbiton-Security\] \[(?:RATE_LIMIT_STRIKE|LOGIN_FAILED)\] IP=<ADDR> .*
+ignoreregex =
+EOF
+
+    # 2. Create Orbiton jail configuration
+    cat << 'EOF' > /etc/fail2ban/jail.d/orbiton.conf
+[orbiton]
+enabled = true
+port = http,https,3000
+filter = orbiton
+logpath = /opt/orbiton-data/security.log
+maxretry = 5
+findtime = 60
+bantime = 1800
+action = iptables-multiport[name=orbiton, port="http,https,3000"]
+EOF
+
+    # Create security.log file if not exists
+    mkdir -p /opt/orbiton-data
+    touch /opt/orbiton-data/security.log
+    chmod 644 /opt/orbiton-data/security.log
+
+    systemctl restart fail2ban >> $LOG_PATH 2>&1 || true
+    systemctl enable fail2ban --quiet 2>/dev/null || true
+    echo -e "${GREEN}✔ Fail2ban security jail configured and activated automatically!${NC}"
+  else
+    echo -e "${YELLOW}⚠ Fail2ban could not be installed/configured. Please install it manually if needed.${NC}"
+  fi
+}
+
 install_panel() {
   echo -e "\n${YELLOW}🛠️ Installing Orbiton Panel...${NC}"
   update_system
@@ -281,6 +323,7 @@ EOF
   systemctl enable orbiton-panel --quiet
   systemctl start orbiton-panel
   echo -e "${GREEN}✔ Orbiton Panel daemon started!${NC}"
+  configure_fail2ban_auto
 }
 
 install_daemon() {
