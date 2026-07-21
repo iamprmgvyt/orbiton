@@ -215,48 +215,134 @@ router.get('/runtimes', async (req, res) => {
 });
 
 // ─── Create App ───────────────────────────────────────────────
-router.post('/', (req, res) => {
-  const { name, description, runtime, start_cmd, install_cmd, env_vars, max_ram, auto_restart, template, node_id } = req.body;
+router.post('/', zipUpload.single('zip'), async (req, res) => {
+  try {
+    const { 
+      name, description, runtime, start_cmd, install_cmd, 
+      env_vars, max_ram, auto_restart, template, node_id,
+      import_type, git_url, git_branch, docker_image
+    } = req.body;
 
-  let tpl = {};
-  if (template && TEMPLATES[template]) {
-    tpl = TEMPLATES[template];
+    let tpl = {};
+    if (template && TEMPLATES[template]) {
+      tpl = TEMPLATES[template];
+    }
+
+    const finalName    = name?.trim() || tpl.name;
+    const finalCmd     = start_cmd?.trim() || tpl.start_cmd;
+    const finalInstall = install_cmd !== undefined ? install_cmd.trim() : (tpl.install_cmd || '');
+    const finalRuntime = runtime || tpl.runtime || 'custom';
+    const finalNodeId  = parseInt(node_id) || 1;
+
+    if (!finalName || !finalCmd)
+      return res.status(400).json({ error: 'name and start_cmd are required' });
+
+    let finalEnv = env_vars || {};
+    if (typeof env_vars === 'string') {
+      try {
+        finalEnv = JSON.parse(env_vars);
+      } catch (_) {
+        finalEnv = {};
+      }
+    }
+
+    const id      = uuidv4();
+    const workDir = `/opt/orbiton-data/apps/${id}`;
+    let importSource = 'manual';
+
+    if (import_type === 'git') {
+      importSource = `git:${git_url}`;
+    } else if (import_type === 'docker') {
+      importSource = `docker:${docker_image}`;
+    } else if (import_type === 'zip' || req.file) {
+      importSource = 'zip';
+    } else if (template) {
+      importSource = `template:${template}`;
+    }
+
+    db.prepare(`
+      INSERT INTO apps (id, name, description, runtime, start_cmd, install_cmd, work_dir,
+                        owner_id, env_vars, max_ram, auto_restart, node_id, import_source)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      finalName,
+      description || tpl.description || '',
+      finalRuntime,
+      finalCmd,
+      finalInstall,
+      workDir,
+      req.user.id,
+      JSON.stringify(finalEnv),
+      max_ram ? parseInt(max_ram) : (tpl.max_ram || 512),
+      auto_restart === 'true' || auto_restart === true || auto_restart === 1 ? 1 : 0,
+      finalNodeId,
+      importSource
+    );
+
+    // ─── Post-creation asynchronous actions (Importing) ───
+    if (import_type === 'git' && git_url) {
+      daemonRequest(`/api/apps/${id}/import/git`, 'POST', {
+        url: git_url,
+        branch: git_branch || 'main',
+        installCmd: finalInstall
+      }, finalNodeId).catch(err => {
+        console.error(`[Panel-Git-Import-Err] App: ${id}, Error: ${err.message}`);
+      });
+    } else if (import_type === 'docker' && docker_image) {
+      daemonRequest(`/api/apps/${id}/import/docker`, 'POST', {
+        image: docker_image
+      }, finalNodeId).catch(err => {
+        console.error(`[Panel-Docker-Import-Err] App: ${id}, Error: ${err.message}`);
+      });
+    } else if (req.file) {
+      // Handle Zip proxying
+      try {
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const fileBlob = new globalThis.Blob([fileBuffer]);
+        const fd = new FormData();
+        fd.append('file', fileBlob, req.file.originalname);
+        fd.append('installCmd', finalInstall);
+
+        // Clean temp file
+        fs.unlink(req.file.path, () => {});
+
+        let targetUrl = DAEMON_URL;
+        let targetToken = DAEMON_TOKEN;
+        if (finalNodeId) {
+          const node = db.prepare('SELECT * FROM nodes WHERE id = ?').get(finalNodeId);
+          if (node) {
+            targetUrl = `http://${node.ip.replace(/\/$/, '')}:${node.port}`;
+            targetToken = node.token;
+          }
+        }
+
+        const fetch = globalThis.fetch;
+        fetch(`${targetUrl}/api/apps/${id}/import/zip`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${targetToken}`
+          },
+          body: fd
+        }).then(async (resD) => {
+          if (!resD.ok) {
+            const errD = await resD.json();
+            console.error(`[Panel-Zip-Import-Err] App: ${id}, Daemon response:`, errD.error);
+          }
+        }).catch(err => {
+          console.error(`[Panel-Zip-Import-Proxy-Err] App: ${id}, Error: ${err.message}`);
+        });
+      } catch (err) {
+        console.error(`[Panel-Zip-Read-Err] App: ${id}, Error: ${err.message}`);
+      }
+    }
+
+    const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
+    cache.flush().catch(() => {});
+    res.status(201).json(app);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const finalName    = name?.trim() || tpl.name;
-  const finalCmd     = start_cmd?.trim() || tpl.start_cmd;
-  const finalInstall = install_cmd !== undefined ? install_cmd.trim() : (tpl.install_cmd || '');
-  const finalRuntime = runtime || tpl.runtime || 'custom';
-  const finalNodeId  = parseInt(node_id) || 1;
-
-  if (!finalName || !finalCmd)
-    return res.status(400).json({ error: 'name and start_cmd are required' });
-
-  const id      = uuidv4();
-  const workDir = `/opt/orbiton-data/apps/${id}`;
-
-  db.prepare(`
-    INSERT INTO apps (id, name, description, runtime, start_cmd, install_cmd, work_dir,
-                      owner_id, env_vars, max_ram, auto_restart, node_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id,
-    finalName,
-    description || tpl.description || '',
-    finalRuntime,
-    finalCmd,
-    finalInstall,
-    workDir,
-    req.user.id,
-    JSON.stringify(env_vars || {}),
-    max_ram || tpl.max_ram || 512,
-    auto_restart ? 1 : 0,
-    finalNodeId
-  );
-
-  const app = db.prepare('SELECT * FROM apps WHERE id = ?').get(id);
-  cache.flush().catch(() => {});
-  res.status(201).json(app);
 });
 
 // ─── Get App ──────────────────────────────────────────────────

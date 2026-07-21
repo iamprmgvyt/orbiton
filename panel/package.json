@@ -1,6 +1,6 @@
 {
   "name": "orbiton",
-  "version": "1.29.0",
+  "version": "1.30.0",
   "description": "Orbiton — Universal App & Server Manager. Lightweight, cross-platform, self-hosted.",
   "main": "server.js",
   "scripts": {
