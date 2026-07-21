@@ -180,7 +180,7 @@ EOF
     echo -e "  - Status check:   ${BOLD}fail2ban-client status orbiton${NC}"
     ;;
   version)
-    echo -e "Orbiton Orchestrator v1.27.0"
+    echo -e "Orbiton Orchestrator v1.28.0"
     ;;
   *)
     show_help

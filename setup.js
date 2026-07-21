@@ -281,7 +281,48 @@ async function main() {
   console.log(`\nFor production Linux hostings, services can be managed via:\n  ${colors.cyan}systemctl start orbiton-panel\n  systemctl start orbiton-daemon${colors.reset}`);
   console.log(`\n${colors.yellow}Thank you for choosing Orbiton!${colors.reset}\n`);
 
+  const startChoice = await askQuestion('* Would you like to start the installed Orbiton services now in development mode? (y/N): ');
   rl.close();
+
+  if (startChoice.trim().toLowerCase() === 'y' || startChoice.trim().toLowerCase() === 'yes') {
+    console.log(`\n${colors.green}Starting Orbiton services in development mode... (Press Ctrl+C to stop)${colors.reset}\n`);
+    const { spawn } = require('child_process');
+    const processes = [];
+
+    if (selection === 0 || selection === 1) {
+      console.log(`${colors.cyan}[System] Spawning Panel process on port ${panelPort}...${colors.reset}`);
+      const panelProc = spawn('node', ['server.js'], { cwd: path.join(__dirname, 'panel'), shell: true });
+      panelProc.stdout.on('data', (data) => {
+        process.stdout.write(`${colors.blue}[Panel]${colors.reset} ${data.toString()}`);
+      });
+      panelProc.stderr.on('data', (data) => {
+        process.stderr.write(`${colors.red}[Panel-Err]${colors.reset} ${data.toString()}`);
+      });
+      processes.push(panelProc);
+    }
+
+    if (selection === 0 || selection === 2) {
+      console.log(`${colors.cyan}[System] Spawning Daemon process on port 9900...${colors.reset}`);
+      const daemonProc = spawn('node', ['server.js'], { cwd: path.join(__dirname, 'daemon'), shell: true });
+      daemonProc.stdout.on('data', (data) => {
+        process.stdout.write(`${colors.yellow}[Daemon]${colors.reset} ${data.toString()}`);
+      });
+      daemonProc.stderr.on('data', (data) => {
+        process.stderr.write(`${colors.red}[Daemon-Err]${colors.reset} ${data.toString()}`);
+      });
+      processes.push(daemonProc);
+    }
+
+    // Handle graceful exit
+    process.on('SIGINT', () => {
+      console.log(`\n${colors.yellow}Shutting down processes...${colors.reset}`);
+      processes.forEach(p => p.kill());
+      process.exit(0);
+    });
+
+    // Keep script alive
+    await new Promise(() => {});
+  }
 }
 
 main().catch(err => {
