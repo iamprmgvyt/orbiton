@@ -130,11 +130,20 @@ Orbiton provides 5 gorgeous built-in themes (Cyberpunk, Ocean, Emerald, Sakura, 
 
 ---
 
-### Method 2: Manual Developer Setup
+### Method 2: Node.js Installer (Recommended for Windows/macOS & Dev environments)
 
-If you prefer to configure manually for development:
+If you prefer to configure manually or are developing on Windows/macOS, we provide a cross-platform Node.js installer that sets up your environment, generates random JWT/Master secrets, and configures `.env` files automatically.
 
-#### 1. Setup Daemon Node (Wings Agent)
+```bash
+# Run the interactive Node.js installer
+node setup.js
+```
+
+#### Manual Developer Setup (Alternative)
+
+If you prefer to configure everything manually by hand:
+
+##### 1. Setup Daemon Node (Wings Agent)
 ```bash
 cd daemon
 npm install
@@ -142,7 +151,7 @@ cp .env.example .env # Add your target DATA_DIR and DAEMON_TOKEN
 node server.js
 ```
 
-#### 2. Setup Web Panel (Master Panel)
+##### 2. Setup Web Panel (Master Panel)
 ```bash
 cd panel
 npm install

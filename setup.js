@@ -1,0 +1,290 @@
+// ======================================================================================
+// Orbiton Cross-Platform Node.js Interactive Setup Script
+// Equivalent to install.sh but written in JS for development and multi-platform compatibility
+// ======================================================================================
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const { execSync } = require('child_process');
+const readline = require('readline');
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+});
+
+const askQuestion = (query) => new Promise((resolve) => rl.question(query, resolve));
+
+// Colors for terminal output
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  red: '\x1b[31m',
+  cyan: '\x1b[36m'
+};
+
+async function welcome() {
+  console.log(`${colors.blue}${colors.bright}`);
+  console.log('   ____    ____    ____     ____    ______   ____    _   __');
+  console.log('  / __ \\  / __ \\  / __ )   /_  _/  /_  __/  / __ \\  / | / /');
+  console.log(' / / / / /_/ / / / __  |    / /     / /    / / / / /  |/ / ');
+  console.log('/ /_/ / / _, _/ / /_/ /   _/ /_    / /    / /_/ / / /|  /  ');
+  console.log('\\____/  /_/ |_| /____/   /___/    /_/     \\____/ /_/ |_|   ');
+  console.log(colors.reset);
+  console.log(`       ${colors.yellow}— Node.js Interactive Installer & Developer Setup —${colors.reset}\n`);
+}
+
+function runCmd(cmd, cwd = process.cwd()) {
+  try {
+    execSync(cmd, { cwd, stdio: 'inherit' });
+    return true;
+  } catch (err) {
+    console.error(`${colors.red}Failed to execute command: ${cmd}${colors.reset}`);
+    return false;
+  }
+}
+
+function configureFail2ban() {
+  if (process.platform !== 'linux') return;
+  
+  // Check if running as root
+  const isRoot = process.getuid && process.getuid() === 0;
+  if (!isRoot) {
+    console.log(`${colors.yellow}⚠️ Skip Fail2ban configuration: not running as root.${colors.reset}`);
+    return;
+  }
+
+  console.log(`\n${colors.yellow}🛡️ Auto-configuring Fail2ban Shield for Panel logs...${colors.reset}`);
+  
+  try {
+    // Check if fail2ban is installed
+    let hasFail2ban = false;
+    try {
+      execSync('which fail2ban-client', { stdio: 'ignore' });
+      hasFail2ban = true;
+    } catch (_) {
+      console.log(`${colors.yellow}Installing Fail2ban via apt...${colors.reset}`);
+      execSync('apt-get update -qq && apt-get install -y fail2ban', { stdio: 'inherit' });
+      hasFail2ban = true;
+    }
+
+    if (hasFail2ban) {
+      // 1. Create filter
+      const filterContent = `[Definition]\nfailregex = ^\\[.*\\] \\[Orbiton-Security\\] \\[(?:RATE_LIMIT_STRIKE|LOGIN_FAILED)\\] IP=<ADDR> .*\nignoreregex =\n`;
+      fs.writeFileSync('/etc/fail2ban/filter.d/orbiton.conf', filterContent);
+
+      // 2. Create jail config
+      const jailContent = `[orbiton]\nenabled = true\nport = http,https,3000\nfilter = orbiton\nlogpath = /opt/orbiton-data/security.log\nmaxretry = 5\nfindtime = 60\nbantime = 1800\naction = iptables-multiport[name=orbiton, port="http,https,3000"]\n`;
+      fs.writeFileSync('/etc/fail2ban/jail.d/orbiton.conf', jailContent);
+
+      // Create log directory/file if needed
+      fs.mkdirSync('/opt/orbiton-data', { recursive: true });
+      const logPath = '/opt/orbiton-data/security.log';
+      if (!fs.existsSync(logPath)) {
+        fs.writeFileSync(logPath, '');
+      }
+      fs.chmodSync(logPath, 0o644);
+
+      // Restart Fail2ban
+      execSync('systemctl restart fail2ban', { stdio: 'ignore' });
+      execSync('systemctl enable fail2ban --quiet', { stdio: 'ignore' });
+      console.log(`${colors.green}✔ Fail2ban security jail configured and activated automatically!${colors.reset}`);
+    }
+  } catch (err) {
+    console.log(`${colors.yellow}⚠ Fail2ban auto-configuration bypassed: ${err.message}${colors.reset}`);
+  }
+}
+
+function writeSystemdServices(panelPort) {
+  if (process.platform !== 'linux') return;
+  const isRoot = process.getuid && process.getuid() === 0;
+  if (!isRoot) return;
+
+  const panelDir = path.join(__dirname, 'panel');
+  const daemonDir = path.join(__dirname, 'daemon');
+
+  console.log(`\n${colors.yellow}⚙️ Registering systemd services (Linux daemon mode)...${colors.reset}`);
+
+  // Panel systemd
+  const panelService = `[Unit]
+Description=Orbiton Panel - Central Manager
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${panelDir}
+ExecStart=/usr/bin/node ${panelDir}/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orbiton-panel
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+  // Daemon systemd
+  const daemonService = `[Unit]
+Description=Orbiton Daemon - Process Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=${daemonDir}
+ExecStart=/usr/bin/node ${daemonDir}/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orbiton-daemon
+
+[Install]
+WantedBy=multi-user.target
+`;
+
+  try {
+    fs.writeFileSync('/etc/systemd/system/orbiton-panel.service', panelService);
+    fs.writeFileSync('/etc/systemd/system/orbiton-daemon.service', daemonService);
+    execSync('systemctl daemon-reload', { stdio: 'ignore' });
+    console.log(`${colors.green}✔ Systemd service configs written successfully.${colors.reset}`);
+  } catch (err) {
+    console.log(`${colors.red}⚠ Failed to write systemd services: ${err.message}${colors.reset}`);
+  }
+}
+
+async function installPanel(allInOneSecret = null) {
+  console.log(`\n${colors.cyan}🛠️  Installing Dependencies for Orbiton Panel...${colors.reset}`);
+  runCmd('npm install --omit=dev', path.join(__dirname, 'panel'));
+
+  console.log(`\n${colors.yellow}* Configure Panel Network Port:${colors.reset}`);
+  console.log('  [1] Run directly on HTTP Port 80');
+  console.log('  [2] Run on custom port (Default: 3000)');
+  const portChoice = await askQuestion('  Select option [1-2, Default: 2]: ');
+  
+  let port = 3000;
+  if (portChoice.trim() === '1') {
+    port = 80;
+  } else {
+    const customPort = await askQuestion('  Enter custom port [Default: 3000]: ');
+    if (customPort.trim()) {
+      port = parseInt(customPort.trim(), 10) || 3000;
+    }
+  }
+
+  const jwtSecret = crypto.randomBytes(32).toString('hex');
+  const daemonToken = allInOneSecret || `orbiton_daemon_secret_${crypto.randomBytes(16).toString('hex')}`;
+
+  const envContent = `PORT=${port}
+SSL_PORT=3443
+JWT_SECRET=${jwtSecret}
+NODE_ENV=production
+DISABLE_SSL=true
+DAEMON_URL=http://localhost:9900
+DAEMON_TOKEN=${daemonToken}
+`;
+
+  fs.writeFileSync(path.join(__dirname, 'panel', '.env'), envContent);
+  console.log(`${colors.green}✔ Panel .env configuration file written successfully.${colors.reset}`);
+
+  // Configure Fail2ban automatically
+  configureFail2ban();
+
+  return { port, daemonToken };
+}
+
+async function installDaemon(allInOneSecret = null) {
+  console.log(`\n${colors.cyan}🛠️  Installing Dependencies for Orbiton Daemon (Wings Agent)...${colors.reset}`);
+  const daemonCwd = path.join(__dirname, 'daemon');
+  runCmd('npm install --omit=dev', daemonCwd);
+  // Optional native pty build
+  console.log(`${colors.yellow}Compiling native process terminals (node-pty)...${colors.reset}`);
+  runCmd('npm install node-pty --build-from-source', daemonCwd);
+
+  let daemonToken = allInOneSecret;
+  if (!daemonToken) {
+    daemonToken = await askQuestion(`\n* Enter Daemon Security Token (leave blank to auto-generate): `);
+    if (!daemonToken.trim()) {
+      daemonToken = `orbiton_daemon_secret_${crypto.randomBytes(16).toString('hex')}`;
+    }
+  }
+
+  const defaultDataDir = process.platform === 'win32'
+    ? path.join(process.env.APPDATA || require('os').homedir(), 'orbiton-data')
+    : '/opt/orbiton-data';
+
+  const envContent = `PORT=9900
+DAEMON_TOKEN=${daemonToken}
+DATA_DIR=${defaultDataDir.replace(/\\/g, '/')}
+`;
+
+  fs.writeFileSync(path.join(__dirname, 'daemon', '.env'), envContent);
+  console.log(`${colors.green}✔ Daemon .env configuration file written successfully.${colors.reset}`);
+}
+
+async function main() {
+  await welcome();
+
+  console.log('Select setup option:');
+  console.log(`  [${colors.green}0${colors.reset}] Install both Panel and Daemon (All-in-One on the same machine)`);
+  console.log(`  [${colors.green}1${colors.reset}] Install Panel only (Central UI & User Database)`);
+  console.log(`  [${colors.green}2${colors.reset}] Install Daemon only (Wings Agent on Node VPS)`);
+  console.log(`  [${colors.green}3${colors.reset}] Cancel`);
+  
+  const choice = await askQuestion('\nEnter option [0-3, Default: 0]: ');
+  const selection = choice.trim() ? parseInt(choice.trim(), 10) : 0;
+
+  if (selection === 3) {
+    console.log('\nSetup cancelled.');
+    rl.close();
+    return;
+  }
+
+  const allInOneSecret = (selection === 0) ? `orbiton_daemon_secret_${crypto.randomBytes(16).toString('hex')}` : null;
+  let panelPort = 3000;
+
+  if (selection === 0) {
+    const panelConfig = await installPanel(allInOneSecret);
+    panelPort = panelConfig.port;
+    await installDaemon(allInOneSecret);
+    writeSystemdServices(panelPort);
+  } else if (selection === 1) {
+    const panelConfig = await installPanel();
+    panelPort = panelConfig.port;
+    writeSystemdServices(panelPort);
+  } else if (selection === 2) {
+    await installDaemon();
+    writeSystemdServices(panelPort);
+  } else {
+    console.log(`${colors.red}Invalid selection. Exiting.${colors.reset}`);
+  }
+
+  console.log(`\n${colors.green}${colors.bright}================================================${colors.reset}`);
+  console.log(`${colors.green}${colors.bright}🪐 Orbiton Node.js Setup Completed Successfully! ${colors.reset}`);
+  console.log(`${colors.green}${colors.bright}================================================${colors.reset}`);
+  
+  if (selection === 0 || selection === 1) {
+    console.log(`\nTo run the Panel in development mode:\n  ${colors.cyan}cd panel && node server.js${colors.reset}`);
+    console.log(`  Web access: ${colors.bright}http://localhost:${panelPort}${colors.reset}`);
+  }
+  if (selection === 0 || selection === 2) {
+    console.log(`\nTo run the Daemon in development mode:\n  ${colors.cyan}cd daemon && node server.js${colors.reset}`);
+  }
+
+  console.log(`\nFor production Linux hostings, services can be managed via:\n  ${colors.cyan}systemctl start orbiton-panel\n  systemctl start orbiton-daemon${colors.reset}`);
+  console.log(`\n${colors.yellow}Thank you for choosing Orbiton!${colors.reset}\n`);
+
+  rl.close();
+}
+
+main().catch(err => {
+  console.error('Setup encountered an error:', err);
+  rl.close();
+});
