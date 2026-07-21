@@ -17,12 +17,13 @@ const authMiddleware = require('../middleware/auth');
 const { JWT_SECRET } = require('../middleware/auth');
 const { revokeToken } = require('../middleware/tokenBlacklist');
 const { logSecurityEvent } = require('../utils/securityLogger');
+const userRateLimit = require('../middleware/userRateLimit');
 
 // Helper: generate a unique JWT token ID
 const genJti = () => crypto.randomBytes(16).toString('hex');
 
 // ─── Setup Status ─────────────────────────────────────────────
-router.get('/setup-status', (req, res) => {
+router.get('/setup-status', userRateLimit.general, (req, res) => {
   try {
     const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
     res.json({ needsSetup: count === 0 });
@@ -32,7 +33,7 @@ router.get('/setup-status', (req, res) => {
 });
 
 // ─── Initial Setup ────────────────────────────────────────────
-router.post('/setup', (req, res) => {
+router.post('/setup', userRateLimit.auth, (req, res) => {
   const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
   if (count > 0) return res.status(400).json({ error: 'Setup already completed' });
 
@@ -53,7 +54,7 @@ const LOCKOUT_LIMIT = 5;
 const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 mins
 
 // ─── Login ────────────────────────────────────────────────────
-router.post('/login', (req, res) => {
+router.post('/login', userRateLimit.auth, (req, res) => {
   const { username, password } = req.body;
   const clientIp = req.ip || 'unknown';
   const now = Date.now();
@@ -167,14 +168,14 @@ router.post('/logout', authMiddleware, (req, res) => {
 });
 
 // ─── Current User ─────────────────────────────────────────────
-router.get('/me', authMiddleware, (req, res) => {
+router.get('/me', authMiddleware, userRateLimit.general, (req, res) => {
   const user = db.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(req.user.id);
   if (!user) return res.status(404).json({ error: 'User not found' });
   res.json(user);
 });
 
 // ─── Change Password ──────────────────────────────────────────
-router.post('/change-password', authMiddleware, (req, res) => {
+router.post('/change-password', authMiddleware, userRateLimit.auth, (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword)
     return res.status(400).json({ error: 'Both passwords required' });
@@ -203,7 +204,7 @@ router.post('/change-password', authMiddleware, (req, res) => {
 });
 
 // ─── Admin: Create User ───────────────────────────────────────
-router.post('/users', authMiddleware, (req, res) => {
+router.post('/users', authMiddleware, userRateLimit.auth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
 
   const { username, password, role = 'user' } = req.body;
@@ -222,14 +223,14 @@ router.post('/users', authMiddleware, (req, res) => {
 });
 
 // ─── Admin: List Users ────────────────────────────────────────
-router.get('/users', authMiddleware, (req, res) => {
+router.get('/users', authMiddleware, userRateLimit.general, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   const users = db.prepare('SELECT id, username, role, created_at FROM users ORDER BY id').all();
   res.json(users);
 });
 
 // ─── Admin: Delete User ───────────────────────────────────────
-router.delete('/users/:id', authMiddleware, (req, res) => {
+router.delete('/users/:id', authMiddleware, userRateLimit.auth, (req, res) => {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
   if (parseInt(req.params.id) === req.user.id) return res.status(400).json({ error: 'Cannot delete yourself' });
   db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);

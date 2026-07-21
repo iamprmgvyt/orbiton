@@ -95,7 +95,7 @@ app.use('/api/auth/login', rateLimit({ windowMs: 60 * 1000, max: 5 }));
 app.use(express.static(FRONTEND));
 
 // ─── API Routes ───────────────────────────────────────────────
-app.use('/api/auth',   userRateLimit.auth, authRoutes);
+app.use('/api/auth',   authRoutes);
 app.use('/api/apps',   authMiddleware, userRateLimit.general, appsRoutes);
 app.use('/api/files',  authMiddleware, userRateLimit.file, fileRoutes);
 app.use('/api/system', authMiddleware, userRateLimit.general, systemRoutes);

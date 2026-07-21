@@ -12,7 +12,7 @@ import Users from './pages/Users';
 import Settings from './pages/Settings';
 import Nodes from './pages/Nodes';
 import CreateNewApp from './pages/CreateNewApp';
-import { getToken, getUser, removeToken } from './utils/api';
+import { api, getToken, getUser, removeToken } from './utils/api';
 import { ShieldAlert } from 'lucide-react';
 
 export default function App() {
@@ -50,12 +50,22 @@ export default function App() {
   const [initialDetailTab, setInitialDetailTab] = useState('logs');
 
   useEffect(() => {
-    const token = getToken();
-    const u = getUser();
-    if (token && u) {
-      setUserState(u);
-    }
-    setTokenChecked(true);
+    const verifyToken = async () => {
+      const token = getToken();
+      if (!token) {
+        setTokenChecked(true);
+        return;
+      }
+      try {
+        const u = await api('/auth/me');
+        setUserState(u);
+      } catch (err) {
+        console.error('Session verification failed:', err.message);
+      } finally {
+        setTokenChecked(true);
+      }
+    };
+    verifyToken();
   }, []);
 
   // Pterodactyl-style URL Routing
