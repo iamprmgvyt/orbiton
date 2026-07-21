@@ -462,6 +462,7 @@ while [ "$done" == false ]; do
     "Install Panel only (Central UI & User Database)"
     "Install Daemon only (Wings Agent on Node VPS)"
     "Configure Let's Encrypt SSL certificate"
+    "Configure Fail2ban automatic DDoS/brute-force IP ban shield"
     "Uninstall Panel & Daemon"
     "Update Orbiton to the Latest Version & Restart Services"
     "Cancel / Exit"
@@ -504,14 +505,24 @@ while [ "$done" == false ]; do
       done=true
       ;;
     4)
-      uninstall_orbiton
+      if [ -f "/usr/local/bin/orbiton" ]; then
+        /usr/local/bin/orbiton fail2ban
+      elif [ -f "$SCRIPT_DIR/orbiton.sh" ]; then
+        bash "$SCRIPT_DIR/orbiton.sh" fail2ban
+      else
+        echo -e "${RED}❌ Orbiton is not installed on this system. Install the Panel/Daemon first.${NC}"
+      fi
       done=true
       ;;
     5)
-      update_orbiton
+      uninstall_orbiton
       done=true
       ;;
     6)
+      update_orbiton
+      done=true
+      ;;
+    7)
       echo -e "${YELLOW}Installation cancelled. Thank you for using Orbiton!${NC}\n"
       exit 0
       ;;

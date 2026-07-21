@@ -23,6 +23,7 @@ show_help() {
   echo -e "  ${GREEN}ports${NC}                   : List all listening network ports on the system"
   echo -e "  ${GREEN}create-admin <u > <p >${NC}  : Create a new Web Panel admin account"
   echo -e "  ${GREEN}reset-password <u > <p >${NC}: Reset password for a panel user account"
+  echo -e "  ${GREEN}fail2ban${NC}                : Install and configure Fail2ban shield for Panel logs"
   echo -e "  ${GREEN}version${NC}                 : Show installed version info"
   echo -e "  ${GREEN}help${NC}                    : Display this options helper menu"
   echo -e "\nCreated by ${YELLOW}iamprmgvyt${NC}"
@@ -135,8 +136,51 @@ case "$1" in
       echo -e "${RED}❌ Web Panel is not installed on this VPS.${NC}"
     fi
     ;;
+  fail2ban)
+    echo -e "${YELLOW}Configuring Fail2ban protection for Orbiton Panel...${NC}"
+    if ! command -v fail2ban-client &>/dev/null; then
+      echo -e "${YELLOW}Fail2ban is not installed. Installing...${NC}"
+      apt-get update -qq && apt-get install -y fail2ban
+    fi
+    
+    # 1. Create Orbiton filter
+    echo -e "${YELLOW}Creating Fail2ban filter rules for Orbiton logs...${NC}"
+    cat << 'EOF' > /etc/fail2ban/filter.d/orbiton.conf
+[Definition]
+failregex = ^\[.*\] \[Orbiton-Security\] \[(?:RATE_LIMIT_STRIKE|LOGIN_FAILED)\] IP=<ADDR> .*
+ignoreregex =
+EOF
+
+    # 2. Create Orbiton jail configuration
+    echo -e "${YELLOW}Creating Fail2ban jail configuration...${NC}"
+    cat << 'EOF' > /etc/fail2ban/jail.d/orbiton.conf
+[orbiton]
+enabled = true
+port = http,https,3000
+filter = orbiton
+logpath = /opt/orbiton-data/security.log
+maxretry = 5
+findtime = 60
+bantime = 1800
+action = iptables-multiport[name=orbiton, port="http,https,3000"]
+EOF
+
+    # Create security.log file if not exists
+    mkdir -p /opt/orbiton-data
+    touch /opt/orbiton-data/security.log
+    chmod 644 /opt/orbiton-data/security.log
+
+    echo -e "${YELLOW}Restarting Fail2ban service...${NC}"
+    systemctl restart fail2ban
+    systemctl enable fail2ban --quiet
+    
+    echo -e "${GREEN}✔ Fail2ban security jail configured and activated successfully!${NC}"
+    echo -e "  - Logs monitored: ${BOLD}/opt/orbiton-data/security.log${NC}"
+    echo -e "  - Fail2ban will automatically block IPs after 5 security/rate-limit strikes for 30 minutes."
+    echo -e "  - Status check:   ${BOLD}fail2ban-client status orbiton${NC}"
+    ;;
   version)
-    echo -e "Orbiton Orchestrator v1.24.0"
+    echo -e "Orbiton Orchestrator v1.25.0"
     ;;
   *)
     show_help

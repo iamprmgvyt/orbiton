@@ -6,6 +6,8 @@
 // Zero dependency on external packages — pure Map/Set for low RAM VPS.
 // ============================================================
 
+const { logSecurityEvent } = require('../utils/securityLogger');
+
 const requestTracker = new Map();   // { id → record }
 const penaltyBox     = new Map();   // { id → { until, strikes } } temporary blocks
 const ipBlacklist    = new Set();   // permanent blocks for serial abusers
@@ -105,6 +107,7 @@ function createLimiter(options = {}) {
       // After 5 strikes → permanent blacklist
       if (strikes >= 5 && ipOnly) {
         ipBlacklist.add(req.ip);
+        logSecurityEvent('IP_BAN', `IP=${req.ip} permanently banned due to heavy spam.`);
         return res.status(403).json({ error: 'Your IP has been permanently banned for repeated spam attacks.' });
       }
 
@@ -112,6 +115,8 @@ function createLimiter(options = {}) {
       const blockMs = Math.min(5000 * Math.pow(2, strikes - 1), 10 * 60 * 1000); // cap at 10 min
       penaltyBox.set(id, { until: now + blockMs, strikes });
       rec.burstCount = 0; // reset so next window is clean
+
+      logSecurityEvent('RATE_LIMIT_STRIKE', `IP=${req.ip} ID=${id} Strike=${strikes}/5 Blocked=${Math.ceil(blockMs / 1000)}s URL=${req.originalUrl}`);
 
       res.setHeader('Retry-After', Math.ceil(blockMs / 1000));
       return res.status(429).json({
@@ -123,6 +128,7 @@ function createLimiter(options = {}) {
     // ── 8. Sustained violation ───────────────────────────────
     if (rec.sustainedCount > sustainedLimit) {
       const waitSec = Math.ceil((rec.sustainedReset - now) / 1000);
+      logSecurityEvent('RATE_LIMIT_SUSTAINED', `IP=${req.ip} ID=${id} Blocked=${waitSec}s URL=${req.originalUrl}`);
       res.setHeader('Retry-After', waitSec);
       return res.status(429).json({
         error: `Rate limit exceeded. You've sent too many requests this minute. Try again in ${waitSec}s.`,

@@ -16,6 +16,7 @@ const { db }  = require('../db/database');
 const authMiddleware = require('../middleware/auth');
 const { JWT_SECRET } = require('../middleware/auth');
 const { revokeToken } = require('../middleware/tokenBlacklist');
+const { logSecurityEvent } = require('../utils/securityLogger');
 
 // Helper: generate a unique JWT token ID
 const genJti = () => crypto.randomBytes(16).toString('hex');
@@ -68,6 +69,7 @@ router.post('/login', (req, res) => {
   const ipLock = ipFailedAttempts.get(clientIp);
   if (ipLock && ipLock.lockUntil > now) {
     const remainingSecs = Math.ceil((ipLock.lockUntil - now) / 1000);
+    logSecurityEvent('BRUTE_FORCE_IP_BLOCKED', `IP=${clientIp} attempted login but is locked out.`);
     return res.status(403).json({
       error: `Too many failed login attempts. Your IP has been temporarily locked. Try again in ${Math.ceil(remainingSecs / 60)} minutes.`
     });
@@ -78,6 +80,7 @@ router.post('/login', (req, res) => {
   const userLock = userFailedAttempts.get(uNameLower);
   if (userLock && userLock.lockUntil > now) {
     const remainingSecs = Math.ceil((userLock.lockUntil - now) / 1000);
+    logSecurityEvent('BRUTE_FORCE_USER_BLOCKED', `User=${username} IP=${clientIp} attempted login but account is locked.`);
     return res.status(403).json({
       error: `Too many failed login attempts. This account is temporarily locked. Try again in ${Math.ceil(remainingSecs / 60)} minutes.`
     });
@@ -94,9 +97,11 @@ router.post('/login', (req, res) => {
     let ipRecord = ipFailedAttempts.get(clientIp) || { count: 0, lockUntil: 0 };
     if (ipRecord.lockUntil <= now) {
       ipRecord.count++;
+      logSecurityEvent('LOGIN_FAILED', `IP=${clientIp} User=${username} failed attempt ${ipRecord.count}/5`);
       if (ipRecord.count >= LOCKOUT_LIMIT) {
         ipRecord.lockUntil = now + LOCKOUT_DURATION;
         ipRecord.count = 0; // reset
+        logSecurityEvent('LOCKOUT_IP', `IP=${clientIp} locked out for 15 mins due to failures.`);
       }
       ipFailedAttempts.set(clientIp, ipRecord);
     }
@@ -108,6 +113,7 @@ router.post('/login', (req, res) => {
       if (userRecord.count >= LOCKOUT_LIMIT) {
         userRecord.lockUntil = now + LOCKOUT_DURATION;
         userRecord.count = 0; // reset
+        logSecurityEvent('LOCKOUT_USER', `Account=${username} locked out for 15 mins due to failures.`);
       }
       userFailedAttempts.set(uNameLower, userRecord);
     }
