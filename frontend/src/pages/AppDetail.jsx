@@ -462,6 +462,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
   const [app, setApp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [actionPending, setActionPending] = useState(false);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -677,6 +678,8 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
     if (action === 'kill') {
       if (!confirm('Are you sure you want to FORCE KILL this process? This might cause data loss.')) return;
     }
+    if (actionPending) return;
+    setActionPending(true);
     
     const socket = socketRef.current;
     const isConsoleActive = activeTab === 'console' && socket;
@@ -697,8 +700,12 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
 
     try {
       await api(`/apps/${appId}/${action}`, 'POST');
-      setTimeout(loadApp, 1000);
+      setTimeout(async () => {
+        await loadApp();
+        setActionPending(false);
+      }, 1000);
     } catch (err) {
+      setActionPending(false);
       if (!isConsoleActive) {
         alert(err.message);
       } else {
@@ -823,34 +830,38 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
               <>
                 <button
                   onClick={() => handleAction('stop')}
-                  className="bg-yellow-500 hover:bg-yellow-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-yellow-500/10 transition-all flex items-center gap-2"
+                  disabled={actionPending}
+                  className="bg-yellow-500 hover:bg-yellow-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-yellow-500/10 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Square className="w-3.5 h-3.5" />
-                  Stop Daemon
+                  {actionPending ? 'Processing...' : 'Stop Daemon'}
                 </button>
                 <button
                   onClick={() => handleAction('restart')}
-                  className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-accent/10 transition-all flex items-center gap-2"
+                  disabled={actionPending}
+                  className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-accent/10 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
-                  Restart
+                  {actionPending ? 'Processing...' : 'Restart'}
                 </button>
               </>
             ) : (
               <button
                 onClick={() => handleAction('start')}
-                className="bg-green-500 hover:bg-green-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-green-500/10 transition-all flex items-center gap-2"
+                disabled={actionPending}
+                className="bg-green-500 hover:bg-green-500/90 active:scale-95 text-white font-semibold text-xs px-4 py-2.5 rounded-xl shadow-lg shadow-green-500/10 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Play className="w-3.5 h-3.5" />
-                Start Daemon
+                {actionPending ? 'Processing...' : 'Start Daemon'}
               </button>
             )}
             <button
               onClick={() => handleAction('kill')}
-              className="bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs px-4 py-2.5 rounded-xl border border-red-500/10 transition-all flex items-center gap-2"
+              disabled={actionPending}
+              className="bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs px-4 py-2.5 rounded-xl border border-red-500/10 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Kill Process
+              {actionPending ? 'Killing...' : 'Kill Process'}
             </button>
           </div>
         )}

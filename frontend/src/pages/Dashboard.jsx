@@ -32,13 +32,19 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
     loadData();
   }, [onRefreshTrigger, user]);
 
+  const [actionLoading, setActionLoading] = useState(false);
+
   const handleAction = async (e, appId, action) => {
     e.stopPropagation();
+    if (actionLoading) return;
+    setActionLoading(true);
     try {
       await api(`/apps/${appId}/${action}`, 'POST');
-      loadData();
+      await loadData();
     } catch (err) {
       alert(err.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -195,15 +201,17 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
                             <>
                               <button
                                 onClick={e => handleAction(e, app.id, 'stop')}
+                                disabled={actionLoading}
                                 title="Stop Application"
-                                className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors"
+                                className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                               >
                                 <Square className="w-3.5 h-3.5 text-yellow-500" />
                               </button>
                               <button
                                 onClick={e => handleAction(e, app.id, 'restart')}
+                                disabled={actionLoading}
                                 title="Restart Application"
-                                className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
+                                className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                               >
                                 <RotateCw className="w-3.5 h-3.5 text-accent" />
                               </button>
@@ -211,8 +219,9 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
                           ) : (
                             <button
                               onClick={e => handleAction(e, app.id, 'start')}
+                              disabled={actionLoading}
                               title="Start Application"
-                              className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors"
+                              className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             >
                               <Play className="w-3.5 h-3.5 text-green-500" />
                             </button>
@@ -226,8 +235,9 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
                           </button>
                           <button
                             onClick={e => handleDelete(e, app.id)}
+                            disabled={actionLoading}
                             title="Delete Application"
-                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-3.5 h-3.5 text-red-500" />
                           </button>

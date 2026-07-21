@@ -45,9 +45,17 @@ router.post('/setup', (req, res) => {
   res.json({ success: true });
 });
 
+// Brute force lockout tables (5 strikes -> 15 min lock)
+const ipFailedAttempts = new Map();
+const userFailedAttempts = new Map();
+const LOCKOUT_LIMIT = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 mins
+
 // ─── Login ────────────────────────────────────────────────────
 router.post('/login', (req, res) => {
   const { username, password } = req.body;
+  const clientIp = req.ip || 'unknown';
+  const now = Date.now();
 
   if (!username || !password)
     return res.status(400).json({ error: 'Username and password required' });
@@ -56,6 +64,25 @@ router.post('/login', (req, res) => {
   if (username.length > 80 || password.length > 200)
     return res.status(400).json({ error: 'Invalid credentials' });
 
+  // Check IP lock
+  const ipLock = ipFailedAttempts.get(clientIp);
+  if (ipLock && ipLock.lockUntil > now) {
+    const remainingSecs = Math.ceil((ipLock.lockUntil - now) / 1000);
+    return res.status(403).json({
+      error: `Too many failed login attempts. Your IP has been temporarily locked. Try again in ${Math.ceil(remainingSecs / 60)} minutes.`
+    });
+  }
+
+  // Check Username lock
+  const uNameLower = username.toLowerCase();
+  const userLock = userFailedAttempts.get(uNameLower);
+  if (userLock && userLock.lockUntil > now) {
+    const remainingSecs = Math.ceil((userLock.lockUntil - now) / 1000);
+    return res.status(403).json({
+      error: `Too many failed login attempts. This account is temporarily locked. Try again in ${Math.ceil(remainingSecs / 60)} minutes.`
+    });
+  }
+
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
 
   // Always run bcrypt even if user not found (prevent username enumeration via timing)
@@ -63,24 +90,50 @@ router.post('/login', (req, res) => {
   const isValid = user ? bcrypt.compareSync(password, user.password) : bcrypt.compareSync(password, dummyHash);
 
   if (!user || !isValid) {
+    // Record failure for IP
+    let ipRecord = ipFailedAttempts.get(clientIp) || { count: 0, lockUntil: 0 };
+    if (ipRecord.lockUntil <= now) {
+      ipRecord.count++;
+      if (ipRecord.count >= LOCKOUT_LIMIT) {
+        ipRecord.lockUntil = now + LOCKOUT_DURATION;
+        ipRecord.count = 0; // reset
+      }
+      ipFailedAttempts.set(clientIp, ipRecord);
+    }
+
+    // Record failure for Username
+    let userRecord = userFailedAttempts.get(uNameLower) || { count: 0, lockUntil: 0 };
+    if (userRecord.lockUntil <= now) {
+      userRecord.count++;
+      if (userRecord.count >= LOCKOUT_LIMIT) {
+        userRecord.lockUntil = now + LOCKOUT_DURATION;
+        userRecord.count = 0; // reset
+      }
+      userFailedAttempts.set(uNameLower, userRecord);
+    }
+
     try {
       db.prepare('INSERT INTO audit_log (user_id, action, ip) VALUES (?, ?, ?)').run(
-        user ? user.id : 0, 'login_failed', req.ip
+        user ? user.id : 0, 'login_failed', clientIp
       );
     } catch (_) {}
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
+  // Reset lockouts on successful login
+  ipFailedAttempts.delete(clientIp);
+  userFailedAttempts.delete(uNameLower);
+
   const jti = genJti();
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role, jti },
     JWT_SECRET,
-    { expiresIn: '24h' } // 24h session (reduced from 7d for security)
+    { expiresIn: '24h' } // 24h session
   );
 
   try {
     db.prepare('INSERT INTO audit_log (user_id, action, ip) VALUES (?, ?, ?)').run(
-      user.id, 'login', req.ip
+      user.id, 'login', clientIp
     );
   } catch (_) {}
 

@@ -44,7 +44,9 @@ function createLimiter(options = {}) {
     sustainedLimit  = 60,      // max hits in sustainedWindowMs
     sustainedWindowMs = 60000, // 1 minute
     blockBot        = false,   // reject bot User-Agents
-    ipOnly          = false    // track by IP even if authenticated
+    ipOnly          = false,   // track by IP even if authenticated
+    delayAfter      = 2,       // start slowing down after 2 hits in burst window
+    delayMs         = 300      // progressive delay in ms
   } = options;
 
   return (req, res, next) => {
@@ -126,6 +128,14 @@ function createLimiter(options = {}) {
         error: `Rate limit exceeded. You've sent too many requests this minute. Try again in ${waitSec}s.`,
         retryAfter: waitSec
       });
+    }
+
+    // ── 9. Progressive slow down delay ──────────────────────
+    if (rec.burstCount > delayAfter) {
+      const delayTime = Math.min((rec.burstCount - delayAfter) * delayMs, 4000); // cap delay at 4s
+      return setTimeout(() => {
+        next();
+      }, delayTime);
     }
 
     next();

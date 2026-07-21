@@ -50,13 +50,19 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user, setActivePage 
     loadApps();
   }, [onRefreshTrigger]);
 
+  const [actionLoading, setActionLoading] = useState(false);
+
   const handleAction = async (e, appId, action) => {
     e.stopPropagation();
+    if (actionLoading) return;
+    setActionLoading(true);
     try {
       await api(`/apps/${appId}/${action}`, 'POST');
-      loadApps();
+      await loadApps();
     } catch (err) {
       alert(err.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -311,14 +317,16 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user, setActivePage 
                         <>
                           <button
                             onClick={e => handleAction(e, app.id, 'stop')}
-                            className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors"
+                            disabled={actionLoading}
+                            className="p-2 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             title="Stop Daemon"
                           >
                             <Square className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={e => handleAction(e, app.id, 'restart')}
-                            className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
+                            disabled={actionLoading}
+                            className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                             title="Restart"
                           >
                             <RotateCw className="w-3.5 h-3.5" />
@@ -327,7 +335,8 @@ export default function Apps({ onOpenApp, onRefreshTrigger, user, setActivePage 
                       ) : (
                         <button
                           onClick={e => handleAction(e, app.id, 'start')}
-                          className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors"
+                          disabled={actionLoading}
+                          className="p-2 rounded-lg bg-green-500/10 hover:bg-green-500/20 text-green-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                           title="Start Daemon"
                         >
                           <Play className="w-3.5 h-3.5" />
