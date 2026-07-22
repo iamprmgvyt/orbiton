@@ -38,24 +38,38 @@ function getModule(name) {
 }
 
 function showHelp() {
-  console.log(`${colors.blue}${colors.bright}🪐 Orbiton System CLI Manager${colors.reset}`);
-  console.log(`Usage: ${colors.green}orbiton <command|flag> [args]${colors.reset}\n`);
-  console.log('Commands & Flags:');
-  console.log(`  ${colors.green}start, -s, --start${colors.reset}                  : Start Orbiton Panel and Daemon Node services`);
-  console.log(`  ${colors.green}stop, -p, --stop${colors.reset}                    : Stop Orbiton Panel and Daemon Node services`);
-  console.log(`  ${colors.green}restart, -r, --restart${colors.reset}              : Restart both Orbiton Panel and Daemon Node`);
-  console.log(`  ${colors.green}status, -st, --status${colors.reset}               : Show systemd status for Orbiton services`);
-  console.log(`  ${colors.green}logs, -l, --logs${colors.reset}                    : View real-time systemd service output logs`);
-  console.log(`  ${colors.green}update, -u, --update${colors.reset}                : Pull latest updates from GitHub and reload services`);
-  console.log(`  ${colors.green}apps, -a, --apps${colors.reset}                    : List all applications configured on the panel`);
-  console.log(`  ${colors.green}sysinfo, -i, --sysinfo${colors.reset}              : Display real-time VPS diagnostics (CPU/RAM/Uptime)`);
-  console.log(`  ${colors.green}ports, -po, --ports${colors.reset}                 : List all listening network ports on the system`);
-  console.log(`  ${colors.green}create-admin, -ca, --create-admin <u > <p >${colors.reset}: Create a new Web Panel admin account`);
-  console.log(`  ${colors.green}reset-password, -rp, --reset-password <u > <p >${colors.reset}: Reset password for a panel user account`);
-  console.log(`  ${colors.green}fail2ban, -f, --fail2ban${colors.reset}             : Install and configure Fail2ban shield for Panel logs`);
-  console.log(`  ${colors.green}version, -v, --version${colors.reset}               : Show installed version info`);
-  console.log(`  ${colors.green}help, -h, --h, --help${colors.reset}                : Display this options helper menu\n`);
-  console.log(`Created by ${colors.yellow}iamprmgvyt${colors.reset}`);
+  console.log(`\n${colors.cyan}${colors.bright}🪐 Orbiton System CLI Manager (v1.35.0)${colors.reset}`);
+  console.log(`Usage: ${colors.green}sudo orbiton <command|flag> [args]${colors.reset}\n`);
+  console.log(`${colors.bright}Commands & Short Flags:${colors.reset}`);
+  
+  const items = [
+    ['start',          '-s, --start',        'Start Panel & Daemon services'],
+    ['stop',           '-p, --stop',         'Stop Panel & Daemon services'],
+    ['restart',        '-r, --restart',      'Restart Panel & Daemon services'],
+    ['status',         '-st, --status',      'Show systemd service status'],
+    ['logs',           '-l, --logs',         'Stream live system output logs'],
+    ['update',         '-u, --update',       'Pull latest code from GitHub'],
+    ['apps',           '-a, --apps',         'List all configured applications'],
+    ['sysinfo',        '-i, --sysinfo',      'Display VPS hardware info'],
+    ['ports',          '-po, --ports',       'List listening network ports'],
+    ['create-admin',   '-ca, --create-admin', 'Create a new Admin account'],
+    ['reset-password', '-rp, --reset-pass',  'Reset user account password'],
+    ['fail2ban',       '-f, --fail2ban',     'Configure Fail2ban DDoS shield'],
+    ['version',        '-v, --version',      'Show installed version info'],
+    ['help',           '-h, -h, --help',     'Display this help menu']
+  ];
+
+  items.forEach(([cmd, flag, desc]) => {
+    const col1 = cmd.padEnd(15, ' ');
+    const col2 = flag.padEnd(20, ' ');
+    console.log(`  ${colors.green}${col1}${colors.reset} ${colors.yellow}${col2}${colors.reset} ${desc}`);
+  });
+
+  console.log(`\n${colors.bright}Examples:${colors.reset}`);
+  console.log(`  ${colors.cyan}sudo orbiton start${colors.reset}`);
+  console.log(`  ${colors.cyan}sudo orbiton -i${colors.reset}`);
+  console.log(`  ${colors.cyan}sudo orbiton create-admin admin mypassword${colors.reset}\n`);
+  console.log(`Created by ${colors.yellow}iamprmgvyt${colors.reset}\n`);
 }
 
 function runCmd(cmd, options = {}) {
