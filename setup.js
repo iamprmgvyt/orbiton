@@ -14,6 +14,13 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
+// ─── Enforce Root Permissions (Linux/Unix) ─────────────────────
+if (process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() !== 0) {
+  console.error(`\x1b[31m\x1b[1m❌ CRITICAL SECURITY ERROR: Orbiton setup script must be run as root!\x1b[0m`);
+  console.error(`👉 Please run using sudo: \x1b[33msudo node setup.js\x1b[0m\n`);
+  process.exit(1);
+}
+
 const askQuestion = (query) => new Promise((resolve) => rl.question(query, resolve));
 
 // Colors for terminal output

@@ -71,12 +71,13 @@ The Orbiton Panel runs on any VPS running Ubuntu 20.04 LTS or newer. It acts as 
 
 ---
 
-### System Requirements
+### System Requirements & Security Norms
 * Ubuntu 20.04+ (Debian-based recommended).
-* Node.js v18.x or newer.
+* Node.js v20.x or newer.
+* **Root Privileges:** All installer and setup scripts (\`install.sh\`, \`sudo node setup.js\`, \`sudo orbiton\`) **must be executed as root**.
 * Ports \`3000\` (HTTP) and \`3443\` (HTTPS - optional) open in your firewall.
 
-### Quick Bash Installation
+### Quick Bash Installation (Root Required)
 Clone the entire repository onto your VPS host and run the interactive bash installer:
 \`\`\`bash
 git clone https://github.com/iamprmgvyt/orbiton.git
@@ -85,8 +86,16 @@ sudo bash install.sh
 \`\`\`
 *Select option **1** to install the **Orbiton Panel** only (or option **0** for All-in-One panel + daemon setup).*
 
-### Manual Setup
-If you prefer setting up manually:
+### Initial Admin Setup Token Security
+When starting the Panel for the first time with a clean database:
+1. Check server startup logs for the **Setup Token**:
+   \`\`\`text
+   🔑 INITIAL ADMIN SETUP TOKEN: a1b2c3d4e5f67890123456789abcdef0
+   \`\`\`
+2. Submit your initial Admin setup request with header \`x-setup-token: <TOKEN>\` or field \`setupToken\` to complete admin registration.
+
+### Manual Setup (Strict Enforcements)
+If setting up manually, generate secrets using \`openssl rand -hex 32\`:
 \`\`\`bash
 # 1. Clone repository
 git clone https://github.com/iamprmgvyt/orbiton.git
@@ -95,20 +104,28 @@ cd orbiton/panel
 # 2. Install dependencies
 npm install
 
-# 3. Create .env file
-echo "PORT=3000" > .env
-echo "JWT_SECRET=generate_your_jwt_secret_key" >> .env
-echo "DAEMON_URL=http://localhost:9900" >> .env
-echo "DAEMON_TOKEN=your_master_daemon_token" >> .env
+# 3. Create .env file with generated secrets (Mandatory in v1.34.0!)
+JWT_SEC=$(openssl rand -hex 32)
+DAEMON_SEC=$(openssl rand -hex 32)
+
+cat <<EOF > .env
+PORT=3000
+SSL_PORT=3443
+JWT_SECRET=\${JWT_SEC}
+NODE_ENV=production
+DISABLE_SSL=true
+DAEMON_URL=http://localhost:9900
+DAEMON_TOKEN=\${DAEMON_SEC}
+EOF
 
 # 4. Build frontend
 cd ../frontend
 npm install
 npm run build
 
-# 5. Start Panel
+# 5. Start Panel with sudo
 cd ../panel
-npm start
+sudo node server.js
 \`\`\`
     `
   },
@@ -156,9 +173,49 @@ cat <<EOF > config.json
 }
 EOF
 
-# 5. Start Daemon
-node server.js
+# 5. Start Daemon with sudo
+sudo node server.js
 \`\`\`
+    `
+  },
+  {
+    id: 'security-hardening',
+    category: 'Installation',
+    title: 'Security & Hardening Architecture',
+    content: `
+# Security & Hardening Architecture (v1.34.0)
+
+Orbiton incorporates robust security standards to protect Panel and Daemon instances deployed in production environments.
+
+---
+
+### Key Security Standards
+
+#### 1. Mandatory Random Secrets
+* Hardcoded fallback secrets are completely disabled in v1.34.0.
+* \`JWT_SECRET\` and \`DAEMON_TOKEN\` must be set via environment variables.
+* Generate secure 256-bit secrets using:
+  \`\`\`bash
+  openssl rand -hex 32
+  \`\`\`
+
+#### 2. Root Execution Enforcement
+* All installer scripts (\`install.sh\`), Node setup (\`sudo node setup.js\`), and CLI manager commands (\`sudo orbiton ...\`) require root privileges on Linux hosts.
+
+#### 3. Initial Setup Race-Condition Protection
+* When starting a fresh Panel database, a random **Setup Token** is generated on load and printed to the server console.
+* Initial Admin creation via \`POST /api/auth/setup\` requires passing this token via header \`x-setup-token\` or body field \`setupToken\`.
+
+#### 4. Constant-Time Authentication (\`crypto.timingSafeEqual\`)
+* Daemon API requests and WebSocket handshakes use timing-safe comparison buffer logic to prevent timing attack vulnerabilities.
+
+#### 5. Scoped WebSocket Terminal Permissions
+* Accessing interactive app terminals requires explicit \`can_console\` sub-user permissions or app ownership.
+* Requesting Host System Shells (omitting \`appId\`) is restricted exclusively to Admin role accounts.
+
+#### 6. CORS Policy & Reverse Proxy
+* When \`ALLOWED_ORIGINS\` is unconfigured, CORS restricts access strictly to Same-Origin and Localhost (\`127.0.0.1\` / \`localhost\`).
+* A production-ready Nginx reverse proxy template (\`nginx.conf.example\`) with rate-limiting and connection caps is provided in the repository root.
     `
   },
   {

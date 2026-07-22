@@ -70,6 +70,9 @@ To set up the bots, simply copy `.env.example` to `.env` in the respective bot d
 
 ## 📦 Installation & Setup
 
+> [!IMPORTANT]
+> **Root Requirement:** On Linux/Unix systems, all setup scripts (`install.sh`, `sudo node setup.js`) and global CLI management commands (`sudo orbiton ...`) **must be executed with root privileges (`sudo`)**.
+
 ### Method 1: Auto-Installer (Recommended for Ubuntu VPS)
 
 This interactive installer script automatically sets up Node.js, SQLite, UFW firewall configurations, generates systemd daemons, and configures startup services.
@@ -79,7 +82,7 @@ This interactive installer script automatically sets up Node.js, SQLite, UFW fir
 git clone https://github.com/iamprmgvyt/orbiton.git
 cd orbiton
 
-# Execute the interactive auto-installer
+# Execute the interactive auto-installer (Root privileges required!)
 sudo bash install.sh
 ```
 
@@ -123,41 +126,29 @@ sudo orbiton version
 sudo orbiton help
 ```
 
-### 🎨 Premium Multi-Theme Customizer
+---
 
-Orbiton provides 5 gorgeous built-in themes (Cyberpunk, Ocean, Emerald, Sakura, Nordic) map-linked with smooth color transition states. 
-* To switch themes: Go to **Settings** -> **Themes & Style** and select your preferred palette.
+### Method 2: Node.js Installer (Cross-Platform)
+
+If you prefer to configure manually or are developing on Windows/macOS, we provide a cross-platform Node.js installer that sets up your environment, generates random JWT/Master secrets (`openssl rand -hex 32`), and configures `.env` files automatically.
+
+```bash
+# Run the interactive Node.js installer (sudo required on Linux/macOS)
+sudo node setup.js
+```
 
 ---
 
-### Method 2: Node.js Installer (Recommended for Windows/macOS & Dev environments)
+## 🛡️ Security & Hardening Architecture (v1.34.0)
 
-If you prefer to configure manually or are developing on Windows/macOS, we provide a cross-platform Node.js installer that sets up your environment, generates random JWT/Master secrets, and configures `.env` files automatically.
+Orbiton includes production-grade security standards out-of-the-box:
 
-```bash
-# Run the interactive Node.js installer
-node setup.js
-```
-
-#### Manual Developer Setup (Alternative)
-
-If you prefer to configure everything manually by hand:
-
-##### 1. Setup Daemon Node (Wings Agent)
-```bash
-cd daemon
-npm install
-cp .env.example .env # Add your target DATA_DIR and DAEMON_TOKEN
-node server.js
-```
-
-##### 2. Setup Web Panel (Master Panel)
-```bash
-cd panel
-npm install
-cp .env.example .env # Add DAEMON_URL, DAEMON_TOKEN, and JWT_SECRET
-node server.js
-```
+* **🔐 Mandatory Random Secrets:** Hardcoded default secrets are strictly prohibited. `JWT_SECRET` and `DAEMON_TOKEN` must be generated using `openssl rand -hex 32`.
+* **🔑 Initial Setup Token:** Fresh Panel installations output a unique **Setup Token** in server startup logs required to register the initial Admin account.
+* **⚡ Constant-Time Token Verification:** Daemon REST APIs & Socket.IO connections use `crypto.timingSafeEqual` buffer comparisons to defeat timing attacks.
+* **🌐 Restricted CORS Policy:** Defaults strictly to Same-Origin and Localhost (`127.0.0.1` / `localhost`) unless `ALLOWED_ORIGINS` is configured.
+* **🔒 Production Reverse Proxy:** Sample Nginx config (`nginx.conf.example`) is included with Layer 7 Anti-DDoS rate-limiting (`limit_req`) and connection caps.
+* **📁 Path Traversal Protection:** Throttled `safePath()` boundary resolution prevents directory breakout across matching application IDs.
 
 ---
 
