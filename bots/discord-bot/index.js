@@ -99,7 +99,15 @@ const commands = [
 
   new SlashCommandBuilder()
     .setName('stats')
-    .setDescription('Display resources utilization of the VPS host node.')
+    .setDescription('Display resources utilization of the VPS host node.'),
+
+  new SlashCommandBuilder()
+    .setName('nodes')
+    .setDescription('Display status of all registered worker nodes in the cluster.'),
+
+  new SlashCommandBuilder()
+    .setName('branding')
+    .setDescription('View current panel customization and public configurations.')
 ].map(command => command.toJSON());
 
 // Deploy slash commands
@@ -128,7 +136,13 @@ async function registerSlashCommands() {
 
 client.once('ready', async () => {
   console.log(`🤖 Logged in as Discord Bot: ${client.user.tag}`);
-  client.user.setActivity('Orbiton Panel', { type: ActivityType.Watching });
+  try {
+    const publicSettings = await axios.get(`${PANEL_URL}/api/auth/settings/public`);
+    const pName = publicSettings.data?.panel_name || 'Orbiton';
+    client.user.setActivity(pName, { type: ActivityType.Watching });
+  } catch (_) {
+    client.user.setActivity('Orbiton Panel', { type: ActivityType.Watching });
+  }
   await authenticateWithPanel();
   await registerSlashCommands();
 });
@@ -154,7 +168,7 @@ client.on('interactionCreate', async (interaction) => {
         embed.addFields({ name: 'No Applications', value: 'There are no apps hosted on this panel.' });
       } else {
         apps.forEach(app => {
-          const statusEmoji = app.liveStatus === 'running' ? '🟢 Running' : '🔴 Stopped';
+          const statusEmoji = app.status === 'running' || app.liveStatus === 'running' ? '🟢 Running' : '🔴 Stopped';
           embed.addFields({
             name: `${app.name} (\`${app.id.substring(0, 8)}...\`)`,
             value: `• **Status:** ${statusEmoji}\n• **Runtime:** \`${app.runtime}\`\n• **Owner:** \`${app.owner_name}\``,
@@ -192,6 +206,43 @@ client.on('interactionCreate', async (interaction) => {
           { name: '💾 Memory', value: `\`${stats.memory.usedPercent}%\` (${Math.round(stats.memory.used / 1024 / 1024)}MB / ${Math.round(stats.memory.total / 1024 / 1024)}MB)`, inline: true },
           { name: '💿 OS Info', value: `\`${stats.os.distro}\` (${stats.os.arch})`, inline: false },
           { name: '⏱️ Uptime', value: `\`${Math.round(stats.os.uptime / 3600)} Hours\``, inline: true }
+        )
+        .setTimestamp()
+        .setFooter({ text: '🤖 Orbiton Controller Bot | Created by iamprmgvyt' });
+
+      await interaction.editReply({ embeds: [embed] });
+    }
+
+    else if (commandName === 'nodes') {
+      const nodes = await apiRequest('/api/nodes');
+      const embed = new EmbedBuilder()
+        .setTitle('🌐 Registered Cluster Nodes')
+        .setColor('#10b981')
+        .setTimestamp()
+        .setFooter({ text: '🤖 Orbiton Controller Bot | Created by iamprmgvyt' });
+
+      if (!nodes || nodes.length === 0) {
+        embed.setDescription('No worker nodes registered.');
+      } else {
+        nodes.forEach(n => {
+          embed.addFields({
+            name: `📍 Node: ${n.name} (ID: ${n.id})`,
+            value: `• **FQDN:** \`${n.fqdn}:${n.port}\`\n• **Status:** ${n.status === 'online' ? '🟢 Online' : '🔴 Offline'}\n• **Is Master:** \`${n.is_master ? 'Yes' : 'No'}\``
+          });
+        });
+      }
+
+      await interaction.editReply({ embeds: [embed] });
+    }
+
+    else if (commandName === 'branding') {
+      const publicSettings = await axios.get(`${PANEL_URL}/api/auth/settings/public`);
+      const embed = new EmbedBuilder()
+        .setTitle('🏷️ Panel Branding Configuration')
+        .setColor('#f59e0b')
+        .addFields(
+          { name: 'Panel Brand Name', value: `\`${publicSettings.data?.panel_name || 'Orbiton'}\``, inline: true },
+          { name: 'Panel URL', value: `\`${PANEL_URL}\``, inline: true }
         )
         .setTimestamp()
         .setFooter({ text: '🤖 Orbiton Controller Bot | Created by iamprmgvyt' });

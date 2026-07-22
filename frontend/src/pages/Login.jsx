@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { api, setToken, setUser } from '../utils/api';
 import { Shield, Lock, User, UserPlus } from 'lucide-react';
+import Captcha from '../components/Captcha';
 
 export default function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaInput, setCaptchaInput] = useState('');
   const [needsSetup, setNeedsSetup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -25,9 +28,17 @@ export default function Login({ onLoginSuccess }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     setSuccessMsg('');
+
+    // Validate CAPTCHA
+    if (captchaInput.trim() !== captchaAnswer) {
+      setError('❌ Incorrect CAPTCHA verification answer! Please try again.');
+      setCaptchaInput('');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       if (needsSetup) {
@@ -37,6 +48,7 @@ export default function Login({ onLoginSuccess }) {
         setSuccessMsg('Admin account created successfully! Please log in.');
         setUsername('');
         setPassword('');
+        setCaptchaInput('');
       } else {
         // Normal login
         const data = await api('/auth/login', 'POST', { username, password });
@@ -121,6 +133,19 @@ export default function Login({ onLoginSuccess }) {
                 className="w-full bg-bg2 border border-border focus:border-accent text-text placeholder-muted/50 rounded-xl py-3 pl-10 pr-4 outline-none transition-colors"
               />
             </div>
+          </div>
+
+          {/* Anti-Bot Verification CAPTCHA */}
+          <div className="pt-2 border-t border-border/60 space-y-3">
+            <Captcha onCaptchaChange={setCaptchaAnswer} />
+            <input
+              type="text"
+              required
+              value={captchaInput}
+              onChange={(e) => setCaptchaInput(e.target.value)}
+              placeholder="Enter result..."
+              className="w-full bg-bg2 border border-border focus:border-accent text-text placeholder-muted/50 rounded-xl py-2.5 px-4 font-mono text-sm outline-none transition-colors"
+            />
           </div>
 
           <button

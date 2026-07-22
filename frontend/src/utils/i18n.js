@@ -249,7 +249,7 @@ export const translations = {
   }
 };
 
-let currentLang = localStorage.getItem('orbiton_language') || 'vi';
+let currentLang = localStorage.getItem('orbiton_language') || 'en';
 const listeners = new Set();
 
 export function setLanguage(lang) {
