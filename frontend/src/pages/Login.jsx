@@ -6,24 +6,32 @@ import Captcha from '../components/Captcha';
 export default function Login({ onLoginSuccess }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
-  const [captchaInput, setCaptchaInput] = useState('');
+  const [panelName, setPanelName] = useState('Orbiton');
+  const [isVerified, setIsVerified] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Check database setup status on mount
+  // Fetch setup status & public panel settings on mount
   useEffect(() => {
-    const checkSetup = async () => {
+    const initLogin = async () => {
       try {
-        const data = await api('/auth/setup-status');
-        setNeedsSetup(data.needsSetup);
+        const setupData = await api('/auth/setup-status');
+        setNeedsSetup(setupData.needsSetup);
       } catch (err) {
         console.error(err);
       }
+
+      try {
+        const publicSettings = await api('/auth/settings/public');
+        if (publicSettings && publicSettings.panel_name) {
+          setPanelName(publicSettings.panel_name);
+          document.title = `${publicSettings.panel_name} — Sign In`;
+        }
+      } catch (_) {}
     };
-    checkSetup();
+    initLogin();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -31,10 +39,9 @@ export default function Login({ onLoginSuccess }) {
     setError('');
     setSuccessMsg('');
 
-    // Validate CAPTCHA
-    if (captchaInput.trim() !== captchaAnswer) {
-      setError('❌ Incorrect CAPTCHA verification answer! Please try again.');
-      setCaptchaInput('');
+    // Validate anti-bot reCAPTCHA verification
+    if (!isVerified) {
+      setError('❌ Please check "I\'m not a robot" to complete anti-bot verification!');
       return;
     }
 
@@ -48,7 +55,6 @@ export default function Login({ onLoginSuccess }) {
         setSuccessMsg('Admin account created successfully! Please log in.');
         setUsername('');
         setPassword('');
-        setCaptchaInput('');
       } else {
         // Normal login
         const data = await api('/auth/login', 'POST', { username, password });
@@ -79,7 +85,7 @@ export default function Login({ onLoginSuccess }) {
             )}
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-text">
-            {needsSetup ? 'Set Up Admin' : 'Orbiton'}
+            {needsSetup ? 'Set Up Admin' : panelName}
           </h1>
           <p className="text-sm text-muted mt-1 text-center">
             {needsSetup
@@ -135,17 +141,9 @@ export default function Login({ onLoginSuccess }) {
             </div>
           </div>
 
-          {/* Anti-Bot Verification CAPTCHA */}
-          <div className="pt-2 border-t border-border/60 space-y-3">
-            <Captcha onCaptchaChange={setCaptchaAnswer} />
-            <input
-              type="text"
-              required
-              value={captchaInput}
-              onChange={(e) => setCaptchaInput(e.target.value)}
-              placeholder="Enter result..."
-              className="w-full bg-bg2 border border-border focus:border-accent text-text placeholder-muted/50 rounded-xl py-2.5 px-4 font-mono text-sm outline-none transition-colors"
-            />
+          {/* Anti-Bot Verification reCAPTCHA Widget */}
+          <div className="pt-2">
+            <Captcha onVerifyChange={setIsVerified} />
           </div>
 
           <button
