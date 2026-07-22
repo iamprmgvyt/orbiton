@@ -408,7 +408,7 @@ export default function App() {
             <Cpu size={20} />
           </div>
           <span className="brand-name">Orbiton Docs</span>
-          <span className="brand-badge">v1.34.0</span>
+          <span className="brand-badge">v1.35.0</span>
         </div>
 
         <div className="header-actions">
