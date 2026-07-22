@@ -247,6 +247,113 @@ DATA_DIR=${defaultDataDir.replace(/\\/g, '/')}
   console.log(`${colors.green}✔ Daemon .env configuration file written successfully.${colors.reset}`);
 }
 
+async function letsencryptSSL() {
+  console.log(`\n${colors.cyan}🔒 Let's Encrypt SSL Certificate Setup${colors.reset}`);
+  const cfChoice = await askQuestion('* Do you use Cloudflare SSL/TLS Proxy (Flexible/Full) for this domain? (y/N): ');
+  
+  const panelEnvPath = path.join(__dirname, 'panel', '.env');
+  
+  if (cfChoice.trim().toLowerCase() === 'y') {
+    console.log(`${colors.green}✔ Configuring for Cloudflare Proxy. Panel runs on HTTP behind Cloudflare HTTPS.${colors.reset}`);
+    if (fs.existsSync(panelEnvPath)) {
+      let content = fs.readFileSync(panelEnvPath, 'utf8');
+      content = content.replace(/DISABLE_SSL=false/g, 'DISABLE_SSL=true');
+      fs.writeFileSync(panelEnvPath, content);
+    }
+    const certsDir = path.join(__dirname, 'panel', 'certs');
+    if (fs.existsSync(certsDir)) fs.rmSync(certsDir, { recursive: true, force: true });
+    runCmd('systemctl restart orbiton-panel || true');
+    return;
+  }
+
+  const domain = await askQuestion('  Enter Domain (e.g. panel.example.com): ');
+  const email = await askQuestion('  Enter Email: ');
+
+  if (!domain.trim() || !email.trim()) {
+    console.log(`${colors.red}Domain and email are required for SSL setup.${colors.reset}`);
+    return;
+  }
+
+  console.log(`${colors.yellow}Requesting Let's Encrypt SSL certificate for ${domain}...${colors.reset}`);
+  const certSuccess = runCmd(`certbot certonly --standalone -d "${domain}" --email "${email}" --agree-tos --non-interactive`);
+
+  const liveCertDir = `/etc/letsencrypt/live/${domain}`;
+  if (certSuccess && fs.existsSync(liveCertDir)) {
+    const certsDir = path.join(__dirname, 'panel', 'certs');
+    if (!fs.existsSync(certsDir)) fs.mkdirSync(certsDir, { recursive: true });
+    
+    try {
+      fs.symlinkSync(path.join(liveCertDir, 'fullchain.pem'), path.join(certsDir, 'fullchain.pem'));
+      fs.symlinkSync(path.join(liveCertDir, 'privkey.pem'), path.join(certsDir, 'privkey.pem'));
+    } catch (_) {}
+
+    if (fs.existsSync(panelEnvPath)) {
+      let content = fs.readFileSync(panelEnvPath, 'utf8');
+      content = content.replace(/DISABLE_SSL=true/g, 'DISABLE_SSL=false');
+      fs.writeFileSync(panelEnvPath, content);
+    }
+
+    runCmd('systemctl restart orbiton-panel || true');
+    console.log(`${colors.green}✔ Let's Encrypt certificate configured and SSL enabled for ${domain}!${colors.reset}`);
+  } else {
+    console.log(`${colors.red}❌ Let's Encrypt certificate generation failed.${colors.reset}`);
+  }
+}
+
+async function uninstallOrbiton() {
+  console.log(`\n${colors.red}${colors.bright}🛑 Uninstalling Orbiton Panel and Daemon...${colors.reset}`);
+  runCmd('systemctl stop orbiton-panel --quiet || true');
+  runCmd('systemctl disable orbiton-panel --quiet || true');
+  runCmd('systemctl stop orbiton-daemon --quiet || true');
+  runCmd('systemctl disable orbiton-daemon --quiet || true');
+
+  try {
+    if (fs.existsSync('/etc/systemd/system/orbiton-panel.service')) fs.unlinkSync('/etc/systemd/system/orbiton-panel.service');
+    if (fs.existsSync('/etc/systemd/system/orbiton-daemon.service')) fs.unlinkSync('/etc/systemd/system/orbiton-daemon.service');
+    runCmd('systemctl daemon-reload || true');
+  } catch (_) {}
+
+  const panelDir = path.join(__dirname, 'panel');
+  const daemonDir = path.join(__dirname, 'daemon');
+  
+  if (fs.existsSync('/opt/orbiton-panel')) fs.rmSync('/opt/orbiton-panel', { recursive: true, force: true });
+  if (fs.existsSync('/opt/orbiton-daemon')) fs.rmSync('/opt/orbiton-daemon', { recursive: true, force: true });
+
+  const purgeChoice = await askQuestion('* Do you want to delete application data database/files at /opt/orbiton-data? (y/N): ');
+  if (purgeChoice.trim().toLowerCase() === 'y') {
+    if (fs.existsSync('/opt/orbiton-data')) fs.rmSync('/opt/orbiton-data', { recursive: true, force: true });
+    console.log(`${colors.green}✔ Application data removed.${colors.reset}`);
+  }
+  console.log(`${colors.green}✔ Orbiton uninstalled successfully.${colors.reset}`);
+}
+
+async function updateOrbiton() {
+  console.log(`\n${colors.yellow}🔄 Updating Orbiton Panel & Daemon to the latest version...${colors.reset}`);
+  runCmd('git config --global --add safe.directory "' + __dirname + '" || true');
+  runCmd('git stash || true');
+  const pullSuccess = runCmd('git pull');
+  if (!pullSuccess) {
+    runCmd('git fetch --all && git reset --hard origin/main');
+  }
+
+  const panelCwd = path.join(__dirname, 'panel');
+  const daemonCwd = path.join(__dirname, 'daemon');
+
+  if (fs.existsSync(panelCwd)) {
+    console.log(`${colors.yellow}Updating Panel package files...${colors.reset}`);
+    runCmd('npm install --omit=dev', panelCwd);
+    runCmd('systemctl restart orbiton-panel || true');
+  }
+
+  if (fs.existsSync(daemonCwd)) {
+    console.log(`${colors.yellow}Updating Daemon package files...${colors.reset}`);
+    runCmd('npm install --omit=dev', daemonCwd);
+    runCmd('systemctl restart orbiton-daemon || true');
+  }
+
+  console.log(`${colors.green}${colors.bright}🪐 Orbiton Update Completed Successfully!${colors.reset}\n`);
+}
+
 async function main() {
   await welcome();
 
@@ -254,13 +361,41 @@ async function main() {
   console.log(`  [${colors.green}0${colors.reset}] Install both Panel and Daemon (All-in-One on the same machine)`);
   console.log(`  [${colors.green}1${colors.reset}] Install Panel only (Central UI & User Database)`);
   console.log(`  [${colors.green}2${colors.reset}] Install Daemon only (Wings Agent on Node VPS)`);
-  console.log(`  [${colors.green}3${colors.reset}] Cancel`);
+  console.log(`  [${colors.green}3${colors.reset}] Configure Let's Encrypt SSL certificate`);
+  console.log(`  [${colors.green}4${colors.reset}] Configure Fail2ban automatic DDoS/brute-force IP ban shield`);
+  console.log(`  [${colors.green}5${colors.reset}] Uninstall Panel & Daemon`);
+  console.log(`  [${colors.green}6${colors.reset}] Update Orbiton to the Latest Version & Restart Services`);
+  console.log(`  [${colors.green}7${colors.reset}] Cancel / Exit`);
   
-  const choice = await askQuestion('\nEnter option [0-3, Default: 0]: ');
+  const choice = await askQuestion('\nEnter option [0-7, Default: 0]: ');
   const selection = choice.trim() ? parseInt(choice.trim(), 10) : 0;
 
-  if (selection === 3) {
+  if (selection === 7) {
     console.log('\nSetup cancelled.');
+    rl.close();
+    return;
+  }
+
+  if (selection === 3) {
+    await letsencryptSSL();
+    rl.close();
+    return;
+  }
+
+  if (selection === 4) {
+    configureFail2ban();
+    rl.close();
+    return;
+  }
+
+  if (selection === 5) {
+    await uninstallOrbiton();
+    rl.close();
+    return;
+  }
+
+  if (selection === 6) {
+    await updateOrbiton();
     rl.close();
     return;
   }
@@ -291,6 +426,8 @@ async function main() {
     writeSystemdServices(panelPort);
   } else {
     console.log(`${colors.red}Invalid selection. Exiting.${colors.reset}`);
+    rl.close();
+    return;
   }
 
   console.log(`\n${colors.green}${colors.bright}================================================${colors.reset}`);
