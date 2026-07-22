@@ -8,8 +8,6 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const bcrypt = require('bcryptjs');
-
 const colors = {
   reset: '\x1b[0m',
   bright: '\x1b[1m',
@@ -22,6 +20,22 @@ const colors = {
 
 const PANEL_DIR = '/opt/orbiton-panel';
 const DAEMON_DIR = '/opt/orbiton-daemon';
+
+function getModule(name) {
+  try {
+    return require(name);
+  } catch (_) {
+    try {
+      const panelPath = path.join(PANEL_DIR, 'node_modules', name);
+      if (fs.existsSync(panelPath)) return require(panelPath);
+    } catch (_) {}
+    try {
+      const localPath = path.join(__dirname, 'panel', 'node_modules', name);
+      if (fs.existsSync(localPath)) return require(localPath);
+    } catch (_) {}
+    throw new Error(`Required module '${name}' is not installed.`);
+  }
+}
 
 function showHelp() {
   console.log(`${colors.blue}${colors.bright}🪐 Orbiton System CLI Manager${colors.reset}`);
@@ -40,7 +54,7 @@ function showHelp() {
   console.log(`  ${colors.green}reset-password, -rp, --reset-password <u > <p >${colors.reset}: Reset password for a panel user account`);
   console.log(`  ${colors.green}fail2ban, -f, --fail2ban${colors.reset}             : Install and configure Fail2ban shield for Panel logs`);
   console.log(`  ${colors.green}version, -v, --version${colors.reset}               : Show installed version info`);
-  console.log(`  ${colors.green}help, -h, --help${colors.reset}                     : Display this options helper menu\n`);
+  console.log(`  ${colors.green}help, -h, --h, --help${colors.reset}                : Display this options helper menu\n`);
   console.log(`Created by ${colors.yellow}iamprmgvyt${colors.reset}`);
 }
 
@@ -71,7 +85,7 @@ const aliasMap = {
   '-rp': 'reset-password', '--reset-password': 'reset-password',
   '-f': 'fail2ban', '--fail2ban': 'fail2ban',
   '-v': 'version', '--version': 'version',
-  '-h': 'help', '--help': 'help'
+  '-h': 'help', '--h': 'help', '--help': 'help'
 };
 
 const command = aliasMap[rawCommand] || rawCommand;
@@ -90,7 +104,7 @@ function getDatabase() {
   if (!fs.existsSync(dbPath)) {
     throw new Error(`Database not found at ${dbPath}`);
   }
-  const Database = require('better-sqlite3');
+  const Database = getModule('better-sqlite3');
   return new Database(dbPath);
 }
 
@@ -185,6 +199,7 @@ switch (command) {
     }
     try {
       const db = getDatabase();
+      const bcrypt = getModule('bcryptjs');
       const hash = bcrypt.hashSync(password, 12);
       db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')").run(username, hash);
       console.log(`${colors.green}✔ Admin account '${username}' created successfully!${colors.reset}`);
@@ -202,6 +217,7 @@ switch (command) {
     }
     try {
       const db = getDatabase();
+      const bcrypt = getModule('bcryptjs');
       const hash = bcrypt.hashSync(rPass, 12);
       const res = db.prepare('UPDATE users SET password = ? WHERE username = ?').run(hash, rUser);
       if (res.changes > 0) {
