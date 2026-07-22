@@ -33,7 +33,7 @@ function safePath(appId, relativePath = '/') {
   const base = path.resolve(APPS_DIR, appId);
   const rel  = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
   const full = path.resolve(base, '.' + rel);
-  if (!full.startsWith(base)) throw new Error('Path traversal denied');
+  if (full !== base && !full.startsWith(base + path.sep)) throw new Error('Path traversal denied');
   return full;
 }
 

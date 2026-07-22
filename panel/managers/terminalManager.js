@@ -19,6 +19,38 @@ function setupSocketHandlers(ioServer) {
 
     // Client request to spin up pty
     socket.on('terminal:create', ({ appId, cols, rows } = {}) => {
+      // ── Permission Verification Guard ────────────────────────
+      if (socket.user.role !== 'admin') {
+        if (!appId) {
+          // Host system terminal requested by non-admin -> Deny & Disconnect
+          socket.emit('terminal:data', { data: '\r\n\x1b[31m[Orbiton Security Error] Access Denied: Only administrators can access host system terminals.\x1b[0m\r\n' });
+          socket.disconnect(true);
+          return;
+        }
+
+        try {
+          const app = db.prepare('SELECT owner_id FROM apps WHERE id = ?').get(appId);
+          if (!app) {
+            socket.emit('terminal:data', { data: '\r\n\x1b[31m[Orbiton Security Error] Access Denied: Application not found.\x1b[0m\r\n' });
+            socket.disconnect(true);
+            return;
+          }
+
+          if (app.owner_id !== socket.user.id) {
+            const perm = db.prepare('SELECT can_console FROM permissions WHERE user_id = ? AND app_id = ?').get(socket.user.id, appId);
+            if (!perm || perm.can_console !== 1) {
+              socket.emit('terminal:data', { data: '\r\n\x1b[31m[Orbiton Security Error] Access Denied: You lack interactive console privileges for this application.\x1b[0m\r\n' });
+              socket.disconnect(true);
+              return;
+            }
+          }
+        } catch (err) {
+          socket.emit('terminal:data', { data: `\r\n\x1b[31m[Orbiton Security Error] Permission check failed: ${err.message}\x1b[0m\r\n` });
+          socket.disconnect(true);
+          return;
+        }
+      }
+
       let targetUrl = DAEMON_URL;
       let targetToken = DAEMON_TOKEN;
 

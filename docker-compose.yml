@@ -17,14 +17,17 @@ services:
     volumes:
       - orbiton-data:/data          # App data & SQLite DB
       - ./certs:/app/certs:ro       # SSL certificates (optional)
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker-in-Docker support
+      # Security Note: Direct Docker socket mounting grants root equivalence to the container.
+      # If Docker containerized execution is required inside this compose container,
+      # consider using a secure docker-socket-proxy or uncomment below at your own risk:
+      # - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - NODE_ENV=production
       - PORT=3000
       - SSL_PORT=3443
       - DATA_DIR=/data
-      # Generate with: openssl rand -hex 32
-      - JWT_SECRET=${JWT_SECRET:-change-me-please-use-openssl-rand-hex-32}
+      # MANDATORY: Generate a secure random secret with: openssl rand -hex 32
+      - JWT_SECRET=${JWT_SECRET}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s

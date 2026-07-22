@@ -25,7 +25,14 @@ const zipUpload = multer({
 });
 
 const PORT = parseInt(process.env.PORT || '9900');
-const DAEMON_TOKEN = process.env.DAEMON_TOKEN || 'orbiton_daemon_secret_token_123';
+const DEFAULT_DAEMON_TOKENS = ['orbiton_daemon_secret_token_123', 'orbiton_daemon_secret_change_me'];
+const DAEMON_TOKEN = process.env.DAEMON_TOKEN;
+
+if (!DAEMON_TOKEN || DEFAULT_DAEMON_TOKENS.includes(DAEMON_TOKEN)) {
+  console.error('\n❌ [CRITICAL SECURITY ERROR] DAEMON_TOKEN is missing or set to an insecure default value in environment variables!');
+  console.error('👉 Please generate a secure token using "openssl rand -hex 32" and set DAEMON_TOKEN in daemon/.env\n');
+  process.exit(1);
+}
 
 app.use(helmet());
 const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
@@ -238,6 +245,8 @@ app.post('/api/apps/:appId/execute', (req, res) => {
   try {
     if (!fs.existsSync(appDir)) return res.status(404).json({ error: 'App workspace directory not found.' });
 
+    console.warn(`[Security Audit] Executing custom shell command for App ${appId} (IP: ${req.ip}): ${command}`);
+
     const { exec } = require('child_process');
     exec(command, { cwd: appDir }, (err, stdout, stderr) => {
       if (err) {
@@ -255,22 +264,49 @@ app.post('/api/apps/:appId/execute', (req, res) => {
 
 
 // ─── Daemon Nginx Reverse Proxy & SSL API ─────────────────────
+const HOSTNAME_REGEX = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+
 app.post('/api/domains/bind', async (req, res) => {
   const { domain, port, sslEnabled } = req.body;
   if (!domain || !port) {
     return res.status(400).json({ error: 'domain and port are required.' });
   }
 
+  // 1. Strict Domain Validation to prevent Command Injection & Invalid Inputs
+  if (typeof domain !== 'string' || domain.length > 253 || !HOSTNAME_REGEX.test(domain)) {
+    return res.status(400).json({ error: 'Invalid domain format. Only standard hostnames are permitted.' });
+  }
+
+  // 2. Strict Port Validation
+  const targetPort = parseInt(port, 10);
+  if (isNaN(targetPort) || targetPort < 1 || targetPort > 65535) {
+    return res.status(400).json({ error: 'Invalid target port number.' });
+  }
+
   const isLinux = process.platform === 'linux';
-  const vhostPath = isLinux ? `/etc/nginx/sites-available/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-${domain}`);
-  const symlinkPath = isLinux ? `/etc/nginx/sites-enabled/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-enabled-${domain}`);
+  const sitesAvailableBase = path.resolve(isLinux ? '/etc/nginx/sites-available' : path.join(os.tmpdir(), 'sites-available'));
+  const sitesEnabledBase = path.resolve(isLinux ? '/etc/nginx/sites-enabled' : path.join(os.tmpdir(), 'sites-enabled'));
+
+  if (!fs.existsSync(sitesAvailableBase)) fs.mkdirSync(sitesAvailableBase, { recursive: true });
+  if (!fs.existsSync(sitesEnabledBase)) fs.mkdirSync(sitesEnabledBase, { recursive: true });
+
+  const vhostPath = path.resolve(sitesAvailableBase, domain);
+  const symlinkPath = path.resolve(sitesEnabledBase, domain);
+
+  // 3. Path Traversal Base Check
+  if (vhostPath !== sitesAvailableBase && !vhostPath.startsWith(sitesAvailableBase + path.sep)) {
+    return res.status(400).json({ error: 'Path traversal denied in virtualhost path.' });
+  }
+  if (symlinkPath !== sitesEnabledBase && !symlinkPath.startsWith(sitesEnabledBase + path.sep)) {
+    return res.status(400).json({ error: 'Path traversal denied in symlink path.' });
+  }
 
   const configContent = `server {
     listen 80;
     server_name ${domain};
 
     location / {
-        proxy_pass http://127.0.0.1:${port};
+        proxy_pass http://127.0.0.1:${targetPort};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -289,27 +325,26 @@ app.post('/api/domains/bind', async (req, res) => {
         fs.symlinkSync(vhostPath, symlinkPath);
       }
 
-      // Reload Nginx to apply Changes
-      const { execSync } = require('child_process');
-      try {
-        execSync('nginx -t', { stdio: 'ignore' });
-        execSync('systemctl reload nginx', { stdio: 'ignore' });
-      } catch (nginxErr) {
-        console.warn('Nginx binary not found or configuration check failed:', nginxErr.message);
-      }
-
-      // If SSL enabled, trigger certbot
-      if (sslEnabled === 1) {
-        try {
-          execSync(`certbot --nginx -d ${domain} --non-interactive --agree-tos --register-unsafely-without-email`, { stdio: 'ignore' });
-          execSync('systemctl reload nginx', { stdio: 'ignore' });
-        } catch (certErr) {
-          console.warn('Certbot SSL certificate generation failed:', certErr.message);
+      // Reload Nginx safely using execFile
+      const { execFile } = require('child_process');
+      execFile('nginx', ['-t'], (nginxTestErr) => {
+        if (!nginxTestErr) {
+          execFile('systemctl', ['reload', 'nginx'], () => {});
+        } else {
+          console.warn('Nginx configuration check failed:', nginxTestErr.message);
         }
+      });
+
+      // If SSL enabled, trigger certbot safely using execFile
+      if (sslEnabled === 1) {
+        execFile('certbot', ['--nginx', '-d', domain, '--non-interactive', '--agree-tos', '--register-unsafely-without-email'], (certErr) => {
+          if (certErr) console.warn('Certbot SSL certificate generation failed:', certErr.message);
+          execFile('systemctl', ['reload', 'nginx'], () => {});
+        });
       }
     }
 
-    res.json({ success: true, message: `Domain ${domain} successfully proxied to port ${port}.` });
+    res.json({ success: true, message: `Domain ${domain} successfully proxied to port ${targetPort}.` });
   } catch (err) {
     res.status(500).json({ error: 'Proxy binding failed: ' + err.message });
   }
@@ -319,19 +354,31 @@ app.post('/api/domains/unbind', async (req, res) => {
   const { domain } = req.body;
   if (!domain) return res.status(400).json({ error: 'domain is required.' });
 
+  if (typeof domain !== 'string' || domain.length > 253 || !HOSTNAME_REGEX.test(domain)) {
+    return res.status(400).json({ error: 'Invalid domain format.' });
+  }
+
   const isLinux = process.platform === 'linux';
-  const vhostPath = isLinux ? `/etc/nginx/sites-available/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-${domain}`);
-  const symlinkPath = isLinux ? `/etc/nginx/sites-enabled/${domain}` : path.join(os.tmpdir(), `orbiton-nginx-enabled-${domain}`);
+  const sitesAvailableBase = path.resolve(isLinux ? '/etc/nginx/sites-available' : path.join(os.tmpdir(), 'sites-available'));
+  const sitesEnabledBase = path.resolve(isLinux ? '/etc/nginx/sites-enabled' : path.join(os.tmpdir(), 'sites-enabled'));
+
+  const vhostPath = path.resolve(sitesAvailableBase, domain);
+  const symlinkPath = path.resolve(sitesEnabledBase, domain);
+
+  if (vhostPath !== sitesAvailableBase && !vhostPath.startsWith(sitesAvailableBase + path.sep)) {
+    return res.status(400).json({ error: 'Path traversal denied in virtualhost path.' });
+  }
+  if (symlinkPath !== sitesEnabledBase && !symlinkPath.startsWith(sitesEnabledBase + path.sep)) {
+    return res.status(400).json({ error: 'Path traversal denied in symlink path.' });
+  }
 
   try {
     if (fs.existsSync(symlinkPath)) fs.unlinkSync(symlinkPath);
     if (fs.existsSync(vhostPath)) fs.unlinkSync(vhostPath);
 
     if (isLinux) {
-      const { execSync } = require('child_process');
-      try {
-        execSync('systemctl reload nginx', { stdio: 'ignore' });
-      } catch (_) {}
+      const { execFile } = require('child_process');
+      execFile('systemctl', ['reload', 'nginx'], () => {});
     }
 
     res.json({ success: true });
@@ -724,14 +771,21 @@ app.get('/api/system/firewall', (req, res) => {
 app.post('/api/system/firewall/open', (req, res) => {
   const { port, protocol } = req.body;
   if (!port) return res.status(400).json({ error: 'Port required' });
-  const { exec } = require('child_process');
   
-  const proto = protocol || 'tcp';
-  const cmd = `ufw allow ${port}/${proto}`;
-  
-  exec(cmd, (err, stdout, stderr) => {
+  const p = parseInt(port, 10);
+  if (isNaN(p) || p < 1 || p > 65535) {
+    return res.status(400).json({ error: 'Invalid port number. Must be an integer between 1 and 65535.' });
+  }
+
+  const proto = (protocol || 'tcp').toLowerCase();
+  if (!['tcp', 'udp'].includes(proto)) {
+    return res.status(400).json({ error: 'Invalid protocol. Must be tcp or udp.' });
+  }
+
+  const { execFile } = require('child_process');
+  execFile('ufw', ['allow', `${p}/${proto}`], (err, stdout, stderr) => {
     if (err) return res.status(500).json({ error: err.message });
-    exec('ufw reload', () => {});
+    execFile('ufw', ['reload'], () => {});
     res.json({ success: true, message: stdout.trim() });
   });
 });
@@ -740,14 +794,21 @@ app.post('/api/system/firewall/open', (req, res) => {
 app.post('/api/system/firewall/close', (req, res) => {
   const { port, protocol } = req.body;
   if (!port) return res.status(400).json({ error: 'Port required' });
-  const { exec } = require('child_process');
   
-  const proto = protocol || 'tcp';
-  const cmd = `ufw delete allow ${port}/${proto}`;
-  
-  exec(cmd, (err, stdout, stderr) => {
+  const p = parseInt(port, 10);
+  if (isNaN(p) || p < 1 || p > 65535) {
+    return res.status(400).json({ error: 'Invalid port number. Must be an integer between 1 and 65535.' });
+  }
+
+  const proto = (protocol || 'tcp').toLowerCase();
+  if (!['tcp', 'udp'].includes(proto)) {
+    return res.status(400).json({ error: 'Invalid protocol. Must be tcp or udp.' });
+  }
+
+  const { execFile } = require('child_process');
+  execFile('ufw', ['delete', 'allow', `${p}/${proto}`], (err, stdout, stderr) => {
     if (err) return res.status(500).json({ error: err.message });
-    exec('ufw reload', () => {});
+    execFile('ufw', ['reload'], () => {});
     res.json({ success: true, message: stdout.trim() });
   });
 });
@@ -851,7 +912,7 @@ io.on('connection', (socket) => {
   });
 });
 
-function printBanner(port, token) {
+function printBanner(port) {
   const logo = `
 \x1b[34m\x1b[1m   ____    ____    ____     ____    ______   ____    _   __
   / __ \\\\  / __ \\\\  / __ )   /_  _/  /_  __/  / __ \\\\  / | / /
@@ -860,11 +921,11 @@ function printBanner(port, token) {
 \\____/  /_/ |_| /____/   /___/    /_/     \\____/ /_/ |_|   \x1b[0m
   
 🪐 \x1b[32mOrbiton Daemon (Wings) is running on port ${port}!\x1b[0m
-   \x1b[33mSecure Token: ${token}\x1b[0m
+   \x1b[36mDaemon Token status: VERIFIED & ACTIVE\x1b[0m
 `;
   console.log(logo);
 }
 
 server.listen(PORT, () => {
-  printBanner(PORT, DAEMON_TOKEN);
+  printBanner(PORT);
 });

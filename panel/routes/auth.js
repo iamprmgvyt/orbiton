@@ -22,6 +22,29 @@ const userRateLimit = require('../middleware/userRateLimit');
 // Helper: generate a unique JWT token ID
 const genJti = () => crypto.randomBytes(16).toString('hex');
 
+let initialSetupToken = null;
+
+function getOrGenSetupToken() {
+  try {
+    const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+    if (count === 0) {
+      if (!initialSetupToken) {
+        initialSetupToken = crypto.randomBytes(16).toString('hex');
+        console.log(`\n=============================================================`);
+        console.log(`🔑 INITIAL ADMIN SETUP TOKEN: ${initialSetupToken}`);
+        console.log(`   Include header 'x-setup-token: ${initialSetupToken}' or field 'setupToken' to complete initial admin setup.`);
+        console.log(`=============================================================\n`);
+      }
+      return initialSetupToken;
+    }
+  } catch (_) {}
+  initialSetupToken = null;
+  return null;
+}
+
+// Generate token on startup if DB is clean
+getOrGenSetupToken();
+
 // ─── Setup Status ─────────────────────────────────────────────
 router.get('/setup-status', userRateLimit.general, (req, res) => {
   try {
@@ -34,8 +57,14 @@ router.get('/setup-status', userRateLimit.general, (req, res) => {
 
 // ─── Initial Setup ────────────────────────────────────────────
 router.post('/setup', userRateLimit.auth, (req, res) => {
-  const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-  if (count > 0) return res.status(400).json({ error: 'Setup already completed' });
+  const activeSetupToken = getOrGenSetupToken();
+  if (!activeSetupToken) return res.status(400).json({ error: 'Setup already completed' });
+
+  const providedToken = req.headers['x-setup-token'] || req.body?.setupToken;
+  if (!providedToken || providedToken !== activeSetupToken) {
+    logSecurityEvent('UNAUTHORIZED_SETUP_ATTEMPT', `IP=${req.ip} attempted setup with invalid or missing token.`);
+    return res.status(403).json({ error: 'Forbidden: Invalid or missing setup token. Check server console startup logs for token.' });
+  }
 
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
@@ -44,6 +73,9 @@ router.post('/setup', userRateLimit.auth, (req, res) => {
 
   const hash = bcrypt.hashSync(password, 12); // cost factor 12 (harder to brute force)
   db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')`).run(username, hash);
+  
+  // Clear setup token after successful admin registration
+  initialSetupToken = null;
   res.json({ success: true });
 });
 
