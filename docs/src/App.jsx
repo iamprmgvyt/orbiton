@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DOCS_SECTIONS } from './docsData';
 import { supabase } from './utils/supabaseClient';
+import { executeTursoQuery } from './utils/tursoClient';
 import { 
   Menu, 
   X, 
@@ -35,6 +36,16 @@ function FeedbackForm() {
 
   const loadFeedbacks = async () => {
     try {
+      const rows = await executeTursoQuery('SELECT * FROM feedbacks ORDER BY id DESC');
+      if (rows && rows.length > 0) {
+        setAllFeedbacks(rows);
+        return;
+      }
+    } catch (tursoErr) {
+      console.warn('[Turso Cloud DB] Fetch failed, falling back to Supabase/localStorage:', tursoErr.message);
+    }
+
+    try {
       if (PANEL_API_URL) {
         const res = await fetch(`${PANEL_API_URL}/feedbacks`);
         if (!res.ok) throw new Error('Failed to fetch from Panel API');
@@ -66,15 +77,24 @@ function FeedbackForm() {
     const newFeedback = { name, email, rating, message };
     
     try {
-      const { error } = await supabase.from('feedbacks').insert([newFeedback]);
-      if (error) throw error;
+      await executeTursoQuery(
+        'INSERT INTO feedbacks (name, email, rating, message) VALUES (?, ?, ?, ?)',
+        [name, email || '', rating, message]
+      );
       setSubmitted(true);
-    } catch (err) {
-      console.warn('Save failed. Saving to localStorage:', err.message);
-      const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
-      list.unshift({ ...newFeedback, date: new Date().toLocaleDateString() });
-      localStorage.setItem('orbiton_feedbacks', JSON.stringify(list));
-      setSubmitted(true);
+    } catch (tursoErr) {
+      console.warn('[Turso Cloud DB] Insert failed, falling back to Supabase:', tursoErr.message);
+      try {
+        const { error } = await supabase.from('feedbacks').insert([newFeedback]);
+        if (error) throw error;
+        setSubmitted(true);
+      } catch (err) {
+        console.warn('Save failed. Saving to localStorage:', err.message);
+        const list = JSON.parse(localStorage.getItem('orbiton_feedbacks') || '[]');
+        list.unshift({ ...newFeedback, date: new Date().toLocaleDateString() });
+        localStorage.setItem('orbiton_feedbacks', JSON.stringify(list));
+        setSubmitted(true);
+      }
     }
 
     setName('');
