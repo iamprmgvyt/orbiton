@@ -163,6 +163,17 @@ function initDatabase() {
     );
   `);
 
+  // Settings table (System configuration, panel branding, etc.)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+  try {
+    db.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES ('panel_name', 'Orbiton')").run();
+  } catch (_) {}
+
   // Cron Job Scheduler Tasks
   db.exec(`
     CREATE TABLE IF NOT EXISTS cron_jobs (

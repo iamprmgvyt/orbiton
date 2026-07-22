@@ -269,4 +269,32 @@ router.delete('/users/:id', authMiddleware, userRateLimit.auth, (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Public Settings (Panel Name) ─────────────────────────────
+router.get('/settings/public', (req, res) => {
+  try {
+    const row = db.prepare("SELECT value FROM settings WHERE key = 'panel_name'").get();
+    res.json({ panel_name: row ? row.value : 'Orbiton' });
+  } catch (_) {
+    res.json({ panel_name: 'Orbiton' });
+  }
+});
+
+// ─── Admin: Update Panel Name ──────────────────────────────────
+router.put('/settings/panel-name', authMiddleware, (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const { panel_name } = req.body;
+  if (!panel_name || !panel_name.trim()) {
+    return res.status(400).json({ error: 'Panel name is required' });
+  }
+
+  const name = panel_name.trim();
+  try {
+    db.prepare("INSERT INTO settings (key, value) VALUES ('panel_name', ?) ON CONFLICT(key) DO UPDATE SET value = ?").run(name, name);
+    logSecurityEvent('PANEL_NAME_UPDATED', { user: req.user.username, new_name: name }, req);
+    res.json({ success: true, panel_name: name });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

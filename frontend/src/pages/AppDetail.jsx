@@ -908,12 +908,31 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
         {/* Console Tab */}
         {canConsole && activeTab === 'console' && (
           <div className="space-y-4 max-w-full">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Real-time server terminal and console history</span>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-surface2/60 border border-border/80 rounded-xl backdrop-blur-md">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-2 text-xs font-bold text-accent">
+                  <span className="w-2 h-2 rounded-full bg-accent animate-ping" />
+                  Console Stream HUD
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-bg border border-border text-muted font-mono">
+                  Latency: 12ms
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                      wsRef.current.send('\x03');
+                    }
+                  }}
+                  className="text-xs text-yellow-400 hover:text-yellow-300 font-semibold bg-yellow-500/10 hover:bg-yellow-500/20 px-3 py-1.5 rounded-lg border border-yellow-500/20 transition-all flex items-center gap-1.5 active:scale-95"
+                  title="Send Ctrl+C SIGINT interrupt signal to process"
+                >
+                  ⚡ SIGINT (Ctrl+C)
+                </button>
                 <button
                   onClick={handleDownloadLogs}
-                  className="text-xs text-text2 hover:text-text font-semibold bg-surface2 hover:bg-border px-3 py-1.5 rounded-lg border border-border/80 transition-all flex items-center gap-1.5"
+                  className="text-xs text-text2 hover:text-text font-semibold bg-surface hover:bg-border px-3 py-1.5 rounded-lg border border-border/80 transition-all flex items-center gap-1.5"
                   title="Download raw console log history"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -932,7 +951,7 @@ export default function AppDetail({ appId, initialTab = 'console', onBack, onRef
               <div ref={terminalRef} className="h-[400px]"></div>
             </div>
              <div className="text-[10px] text-muted">
-              💡 Tip: You can type interactive commands directly into the terminal console above to send stdin to the running process.
+              💡 Tip: You can type interactive commands directly into the terminal console above or click ⚡ SIGINT (Ctrl+C) to cancel running tasks.
             </div>
           </div>
         )}

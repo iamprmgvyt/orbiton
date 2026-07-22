@@ -12,22 +12,25 @@ import {
   X,
   HardDrive
 } from 'lucide-react';
+import { useTranslation } from '../utils/i18n';
 
-export default function Sidebar({ activePage, setActivePage, user, onLogout, isOpen, onClose }) {
+export default function Sidebar({ activePage, setActivePage, user, onLogout, isOpen, onClose, panelName = 'Orbiton' }) {
+  const { t } = useTranslation();
+
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'apps', label: 'Applications', icon: Server },
+    { id: 'dashboard', label: t('nav.dashboard'), icon: LayoutDashboard },
+    { id: 'apps', label: t('nav.apps'), icon: Server },
     { id: 'files', label: 'File Manager', icon: FolderOpen },
-    { id: 'monitor', label: 'System Monitor', icon: Activity },
-    { id: 'runtimes', label: 'Runtime', icon: Cpu },
+    { id: 'monitor', label: t('nav.monitor'), icon: Activity },
+    { id: 'runtimes', label: t('nav.runtimes'), icon: Cpu },
   ];
 
   if (user && user.role === 'admin') {
-    menuItems.push({ id: 'nodes', label: 'Nodes', icon: HardDrive });
-    menuItems.push({ id: 'users', label: 'Users Management', icon: Users });
+    menuItems.push({ id: 'nodes', label: t('nav.nodes'), icon: HardDrive });
+    menuItems.push({ id: 'users', label: t('nav.users'), icon: Users });
   }
 
-  menuItems.push({ id: 'settings', label: 'Settings', icon: Settings });
+  menuItems.push({ id: 'settings', label: t('nav.settings'), icon: Settings });
 
   return (
     <>
@@ -49,8 +52,8 @@ export default function Sidebar({ activePage, setActivePage, user, onLogout, isO
               <Shield className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="font-bold tracking-wide text-text">Orbiton</span>
-              <span className="text-[9px] block text-muted uppercase font-semibold leading-none mt-1">Universal Manager</span>
+              <span className="font-bold tracking-wide text-text">{panelName}</span>
+              <span className="text-[9px] block text-muted uppercase font-semibold leading-none mt-1">{t('brand.tagline')}</span>
             </div>
           </div>
           {/* Close button for mobile */}
@@ -100,7 +103,7 @@ export default function Sidebar({ activePage, setActivePage, user, onLogout, isO
           </div>
           <button
             onClick={onLogout}
-            title="Log Out"
+            title={t('brand.logout')}
             className="p-2 rounded-xl text-muted hover:text-danger hover:bg-danger/10 transition-colors"
           >
             <LogOut className="w-5 h-5" />

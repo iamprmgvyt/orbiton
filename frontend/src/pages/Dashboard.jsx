@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { api, fmtBytes } from '../utils/api';
 import { Play, Square, RotateCw, Terminal, Edit3, Trash2, Cpu, HardDrive } from 'lucide-react';
+import { useTranslation } from '../utils/i18n';
+import TelemetryGauge from '../components/TelemetryGauge';
 
 export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
+  const { t } = useTranslation();
   const [stats, setStats] = useState(null);
   const [apps, setApps] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,78 +64,50 @@ export default function Dashboard({ onOpenApp, onRefreshTrigger, user }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-12">
+      <div className="flex items-center justify-center min-h-[400px]">
         <div className="w-8 h-8 border-4 border-accent/20 border-t-accent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  const runningApps = apps.filter(a => a.liveStatus === 'running').length;
+  const runningApps = apps.filter(a => a.status === 'running').length;
 
   return (
     <div className="space-y-6">
-      {/* Stats Grid (Only for Admin) */}
+      {/* Stats row for Admin */}
       {isAdmin && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* CPU */}
-          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold text-muted uppercase tracking-wider">CPU Usage</span>
-              <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-                <Cpu className="w-4.5 h-4.5" />
-              </div>
-            </div>
-            <div className="text-3xl font-extrabold text-text">{stats?.cpu?.usage}%</div>
-            <p className="text-[10px] text-muted truncate mt-1">{stats?.cpu?.model || 'Detecting...'}</p>
-            <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
-              <div className="bg-yellow-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.cpu?.usage || 0}%` }}></div>
-            </div>
+          {/* CPU Gauge */}
+          <div className="bg-surface border border-border rounded-2xl p-5 transition-all hover:border-border2 flex flex-col items-center justify-center">
+            <span className="text-xs font-bold text-muted uppercase tracking-wider mb-2">{t('dashboard.cpu_usage')}</span>
+            <TelemetryGauge percentage={stats?.cpu?.usage || 0} size={90} label={stats?.cpu?.model || 'Detecting...'} />
           </div>
 
-          {/* RAM */}
-          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold text-muted uppercase tracking-wider">RAM Usage</span>
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-500">
-                <Cpu className="w-4.5 h-4.5" />
-              </div>
-            </div>
-            <div className="text-3xl font-extrabold text-text">{stats?.memory?.usedPercent}%</div>
-            <p className="text-[10px] text-muted truncate mt-1">
-              {stats?.memory ? `${fmtBytes(stats.memory.used)} / ${fmtBytes(stats.memory.total)}` : 'Detecting...'}
-            </p>
-            <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
-              <div className="bg-purple-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.memory?.usedPercent || 0}%` }}></div>
-            </div>
+          {/* RAM Gauge */}
+          <div className="bg-surface border border-border rounded-2xl p-5 transition-all hover:border-border2 flex flex-col items-center justify-center">
+            <span className="text-xs font-bold text-muted uppercase tracking-wider mb-2">{t('dashboard.ram_usage')}</span>
+            <TelemetryGauge 
+              percentage={stats?.memory?.usedPercent || 0} 
+              size={90} 
+              label={stats?.memory ? `${fmtBytes(stats.memory.used)} / ${fmtBytes(stats.memory.total)}` : 'Detecting...'} 
+            />
           </div>
 
-          {/* Disk */}
-          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold text-muted uppercase tracking-wider">Disk space</span>
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-                <HardDrive className="w-4.5 h-4.5" />
-              </div>
-            </div>
-            <div className="text-3xl font-extrabold text-text">{stats?.disk?.[0]?.usedPercent}%</div>
-            <p className="text-[10px] text-muted truncate mt-1">
-              {stats?.disk?.[0] ? `${fmtBytes(stats.disk[0].used)} / ${fmtBytes(stats.disk[0].size)}` : 'Detecting...'}
-            </p>
-            <div className="w-full bg-border rounded-full h-1.5 mt-4 overflow-hidden">
-              <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${stats?.disk?.[0]?.usedPercent || 0}%` }}></div>
-            </div>
+          {/* Disk Gauge */}
+          <div className="bg-surface border border-border rounded-2xl p-5 transition-all hover:border-border2 flex flex-col items-center justify-center">
+            <span className="text-xs font-bold text-muted uppercase tracking-wider mb-2">{t('dashboard.disk_usage')}</span>
+            <TelemetryGauge 
+              percentage={stats?.disk?.[0]?.usedPercent || 0} 
+              size={90} 
+              label={stats?.disk?.[0] ? `${fmtBytes(stats.disk[0].used)} / ${fmtBytes(stats.disk[0].size)}` : 'Detecting...'} 
+            />
           </div>
 
           {/* Running Apps */}
-          <div className="bg-surface border border-border rounded-2xl p-6 transition-all hover:border-border2">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs font-bold text-muted uppercase tracking-wider">Running Apps</span>
-              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center text-green-500">
-                <span className="text-sm font-bold">🚀</span>
-              </div>
-            </div>
-            <div className="text-3xl font-extrabold text-text">{runningApps}</div>
-            <p className="text-[10px] text-muted mt-1">of {apps.length} total applications</p>
+          <div className="bg-surface border border-border rounded-2xl p-5 transition-all hover:border-border2 flex flex-col items-center justify-center">
+            <span className="text-xs font-bold text-muted uppercase tracking-wider mb-2">{t('dashboard.active_apps')}</span>
+            <div className="text-4xl font-extrabold text-accent my-2">{runningApps}</div>
+            <p className="text-xs text-muted">of {apps.length} total applications</p>
           </div>
         </div>
       )}

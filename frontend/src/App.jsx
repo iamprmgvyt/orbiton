@@ -14,6 +14,7 @@ import Nodes from './pages/Nodes';
 import CreateNewApp from './pages/CreateNewApp';
 import { api, getToken, getUser, removeToken } from './utils/api';
 import { ShieldAlert } from 'lucide-react';
+import CommandPalette from './components/CommandPalette';
 
 export default function App() {
   const [user, setUserState] = useState(null);
@@ -24,6 +25,50 @@ export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('orbiton_theme') || 'theme-cyberpunk');
   const [rateLimitNotice, setRateLimitNotice] = useState(null);
   const [rateLimitUntil, setRateLimitUntil] = useState(parseInt(localStorage.getItem('rateLimitUntil') || '0', 10));
+  const [panelName, setPanelName] = useState(localStorage.getItem('orbiton_panel_name') || 'Orbiton');
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [appsList, setAppsList] = useState([]);
+
+  // Fetch Public Panel Settings (Branding Name)
+  useEffect(() => {
+    const fetchPublicSettings = async () => {
+      try {
+        const res = await fetch('/api/auth/settings/public');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.panel_name) {
+            setPanelName(data.panel_name);
+            localStorage.setItem('orbiton_panel_name', data.panel_name);
+          }
+        }
+      } catch (_) {}
+    };
+    fetchPublicSettings();
+  }, [refreshTrigger]);
+
+  // Sync Document Title with Panel Name
+  useEffect(() => {
+    document.title = `${panelName} — Orchestrator`;
+  }, [panelName]);
+
+  // Global Ctrl+K / Cmd+K Command Palette Keyboard Listener
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Fetch App List for Command Palette
+  useEffect(() => {
+    if (user) {
+      api('/apps').then(data => setAppsList(data || [])).catch(() => {});
+    }
+  }, [user, refreshTrigger, activePage]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -164,6 +209,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg flex">
+      {/* Command Palette Spotlight */}
+      <CommandPalette 
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        apps={appsList}
+        onNavigate={(path) => {
+          if (path.startsWith('/apps/')) {
+            const appId = path.replace('/apps/', '');
+            handleOpenAppDetail(appId, 'console');
+          } else {
+            const p = path.replace('/', '');
+            handlePageChange(p || 'dashboard');
+          }
+        }}
+      />
+
       {/* Sidebar Navigation */}
       <Sidebar
         activePage={activePage}
@@ -172,6 +233,7 @@ export default function App() {
         onLogout={handleLogout}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        panelName={panelName}
       />
 
       {/* Main Content Area */}
@@ -182,6 +244,8 @@ export default function App() {
           onOpenSidebar={() => setIsSidebarOpen(true)}
           theme={theme}
           setTheme={setTheme}
+          panelName={panelName}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         />
 
         <main className="flex-1 p-6 max-w-7xl w-full mx-auto page-fade-in" key={activePage}>
@@ -213,13 +277,13 @@ export default function App() {
             <Runtimes onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'users' && (
-            <Users currentUser={user} onRefreshTrigger={refreshTrigger} />
+            <Users onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'nodes' && (
             <Nodes onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'settings' && (
-            <Settings theme={theme} setTheme={setTheme} />
+            <Settings theme={theme} setTheme={setTheme} panelName={panelName} setPanelName={setPanelName} />
           )}
         </main>
       </div>

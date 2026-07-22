@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, removeToken } from '../utils/api';
+import { useTranslation } from '../utils/i18n';
 import { 
   Key, 
   ShieldAlert, 
@@ -9,17 +10,42 @@ import {
   RefreshCw, 
   Palette, 
   Check,
-  ClipboardList 
+  ClipboardList,
+  Tag
 } from 'lucide-react';
 
-export default function Settings({ theme, setTheme }) {
+export default function Settings({ theme, setTheme, panelName, setPanelName }) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('password');
   
+  // Branding state
+  const [inputPanelName, setInputPanelName] = useState(panelName || 'Orbiton');
+  const [brandingLoading, setBrandingLoading] = useState(false);
+
   // Password states
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
+
+  useEffect(() => {
+    if (panelName) setInputPanelName(panelName);
+  }, [panelName]);
+
+  const handleBrandingSubmit = async (e) => {
+    e.preventDefault();
+    if (!inputPanelName.trim()) return alert('Panel Name cannot be empty');
+    setBrandingLoading(true);
+    try {
+      const data = await api('/auth/settings/panel-name', 'PUT', { panel_name: inputPanelName.trim() });
+      if (setPanelName) setPanelName(data.panel_name);
+      alert('Panel branding name updated successfully!');
+    } catch (err) {
+      alert('Failed to update panel name: ' + err.message);
+    } finally {
+      setBrandingLoading(false);
+    }
+  };
 
   // Firewall states
   const [fwActive, setFwActive] = useState(false);
@@ -159,6 +185,19 @@ export default function Settings({ theme, setTheme }) {
     <div className="space-y-6">
       {/* Navigation tabs */}
       <div className="flex border-b border-border gap-2 pb-px overflow-x-auto">
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('branding')}
+            className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
+              activeTab === 'branding'
+                ? 'border-accent text-accent bg-accent/5'
+                : 'border-transparent text-muted hover:text-text'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            Panel Branding
+          </button>
+        )}
         <button
           onClick={() => setActiveTab('password')}
           className={`px-4 py-2.5 text-sm font-semibold rounded-t-xl transition-all border-b-2 flex items-center gap-2 ${
@@ -208,6 +247,37 @@ export default function Settings({ theme, setTheme }) {
           </>
         )}
       </div>
+
+      {/* Panel Branding Form */}
+      {activeTab === 'branding' && isAdmin && (
+        <div className="max-w-md bg-surface border border-border rounded-2xl p-6 shadow-xl relative overflow-hidden">
+          <h3 className="font-bold text-text mb-2">{t('settings.panel_name')}</h3>
+          <p className="text-xs text-muted mb-6">{t('settings.panel_name_desc')}</p>
+
+          <form onSubmit={handleBrandingSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-text2 uppercase tracking-wider mb-2">Display Name</label>
+              <input
+                type="text"
+                required
+                value={inputPanelName}
+                onChange={e => setInputPanelName(e.target.value)}
+                placeholder="e.g. Orbiton, CloudMaster, MyVPS"
+                className="w-full bg-bg border border-border focus:border-accent text-text rounded-xl p-3 outline-none transition-colors text-sm"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={brandingLoading}
+              className="bg-accent hover:bg-accent/90 active:scale-95 text-white font-semibold text-sm px-5 py-3 rounded-xl shadow-lg shadow-accent/15 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Tag className="w-4 h-4" />
+              {t('settings.save_branding')}
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* Password Form */}
       {activeTab === 'password' && (
