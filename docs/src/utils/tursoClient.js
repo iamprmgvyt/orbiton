@@ -3,8 +3,8 @@
 // Lightweight HTTP Pipeline client for Turso LibSQL Database
 // ============================================================
 
-const TURSO_URL = import.meta.env.VITE_TURSO_DB_URL || 'libsql://orbiton-docs-iamprmgvyt.aws-ap-northeast-1.turso.io';
-const TURSO_TOKEN = import.meta.env.VITE_TURSO_AUTH_TOKEN || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3ODQ2OTQ2OTksImlkIjoiMDE5Zjg4MTYtOTMwMS03MTY2LTk4M2YtMmI4NDkyYzhkNjZjIiwia2lkIjoicGtZTlk2RHcxVV95VjZuVEw5N0Z5Q1lQTEEtUXhCU3BidlZpUEFpWWFFRSIsInJpZCI6Ijc1MGFlYzE2LTI1NWItNDY3Ny05YTUwLTE1NGExNDI2ODVhNCJ9.t8cAgHGR3OAu7WWvHJtwELrFjZwfE3OQULTfqeZrz1RirPFGb4hKf5P5D6IHlZGzB2D7eyG66D5QIIjvzxfMAA';
+const TURSO_URL = import.meta.env.VITE_TURSO_DB_URL || '';
+const TURSO_TOKEN = import.meta.env.VITE_TURSO_AUTH_TOKEN || '';
 
 function getHttpsPipelineUrl(urlStr) {
   const clean = urlStr.replace(/^libsql:\/\//, 'https://').replace(/\/$/, '');
@@ -17,6 +17,10 @@ function getHttpsPipelineUrl(urlStr) {
  * @param {Array} args Positional parameters
  */
 export async function executeTursoQuery(sql, args = []) {
+  if (!TURSO_URL || !TURSO_TOKEN) {
+    throw new Error('Turso credentials (VITE_TURSO_DB_URL / VITE_TURSO_AUTH_TOKEN) are not configured.');
+  }
+
   const pipelineUrl = getHttpsPipelineUrl(TURSO_URL);
 
   const formattedArgs = args.map(arg => {
