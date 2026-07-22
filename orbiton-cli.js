@@ -151,6 +151,7 @@ switch (command) {
     if (installerScript) {
       runCmd(`bash "${installerScript}" --update`);
     } else {
+      runCmd('git pull || true');
       if (fs.existsSync(PANEL_DIR)) {
         runCmd(`cd "${PANEL_DIR}" && git pull || true && npm install --omit=dev || true`);
         runCmd('systemctl restart orbiton-panel || true');
@@ -158,6 +159,9 @@ switch (command) {
       if (fs.existsSync(DAEMON_DIR)) {
         runCmd(`cd "${DAEMON_DIR}" && git pull || true && npm install --omit=dev || true`);
         runCmd('systemctl restart orbiton-daemon || true');
+      }
+      if (fs.existsSync('./orbiton-cli.js')) {
+        runCmd('cp ./orbiton-cli.js /usr/local/bin/orbiton && chmod +x /usr/local/bin/orbiton');
       }
       console.log(`${colors.green}✔ Orbiton updated successfully.${colors.reset}`);
     }
