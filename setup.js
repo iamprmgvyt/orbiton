@@ -167,6 +167,30 @@ WantedBy=multi-user.target
   }
 }
 
+function installCLI() {
+  if (process.platform !== 'win32') {
+    console.log(`${colors.yellow}Registering 'orbiton' & 'orbiton-node' global CLI commands...${colors.reset}`);
+    const cliSource = path.join(__dirname, 'orbiton-cli.js');
+    try {
+      if (fs.existsSync(cliSource)) {
+        fs.chmodSync(cliSource, '755');
+        fs.copyFileSync(cliSource, '/usr/local/bin/orbiton');
+        fs.chmodSync('/usr/local/bin/orbiton', '755');
+        fs.copyFileSync(cliSource, '/usr/local/bin/orbiton-node');
+        fs.chmodSync('/usr/local/bin/orbiton-node', '755');
+
+        fs.mkdirSync('/opt/orbiton-installer', { recursive: true });
+        fs.copyFileSync(path.join(__dirname, 'setup.js'), '/opt/orbiton-installer/setup.js');
+        fs.copyFileSync(cliSource, '/opt/orbiton-installer/orbiton-cli.js');
+
+        console.log(`${colors.green}✔ Registered global CLI commands! Try running: 'sudo orbiton help' or 'sudo orbiton status'${colors.reset}`);
+      }
+    } catch (err) {
+      console.log(`${colors.yellow}⚠ Skipped CLI registration: ${err.message}${colors.reset}`);
+    }
+  }
+}
+
 async function installPanel(allInOneSecret = null, defaultDaemonPort = 9900) {
   console.log(`\n${colors.cyan}🛠️  Installing Dependencies for Orbiton Panel...${colors.reset}`);
   runCmd('npm install --omit=dev', path.join(__dirname, 'panel'));
@@ -417,13 +441,16 @@ async function main() {
     panelPort = panelConfig.port;
     await installDaemon(allInOneSecret, daemonPort);
     writeSystemdServices(panelPort);
+    installCLI();
   } else if (selection === 1) {
     const panelConfig = await installPanel();
     panelPort = panelConfig.port;
     writeSystemdServices(panelPort);
+    installCLI();
   } else if (selection === 2) {
     await installDaemon(null, daemonPort);
     writeSystemdServices(panelPort);
+    installCLI();
   } else {
     console.log(`${colors.red}Invalid selection. Exiting.${colors.reset}`);
     rl.close();
