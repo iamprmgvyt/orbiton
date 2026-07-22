@@ -219,7 +219,7 @@ switch (command) {
       process.exit(1);
     }
     if (password.length < 8) {
-      console.log(`${colors.red}❌ Security Error: Password must be at least 8 characters long (matches Web Panel security requirement).${colors.reset}`);
+      console.log(`${colors.red}❌ Security Error: Password must be at least 8 characters long.${colors.reset}`);
       process.exit(1);
     }
     try {
@@ -241,7 +241,7 @@ switch (command) {
       process.exit(1);
     }
     if (rPass.length < 8) {
-      console.log(`${colors.red}❌ Security Error: New password must be at least 8 characters long (matches Web Panel security requirement).${colors.reset}`);
+      console.log(`${colors.red}❌ Security Error: New password must be at least 8 characters long.${colors.reset}`);
       process.exit(1);
     }
     try {
