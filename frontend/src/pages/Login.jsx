@@ -49,17 +49,20 @@ export default function Login({ onLoginSuccess }) {
 
     try {
       if (needsSetup) {
-        // Setup initial admin
+        // Setup initial master admin directly from Web UI
         await api('/auth/setup', 'POST', { username, password });
-        setNeedsSetup(false);
-        setSuccessMsg('Admin account created successfully! Please log in.');
-        setUsername('');
-        setPassword('');
+        // Immediately log in with created credentials
+        const data = await api('/auth/login', 'POST', { username, password });
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('login_time', String(Date.now()));
+        onLoginSuccess(data.user);
       } else {
         // Normal login
         const data = await api('/auth/login', 'POST', { username, password });
         setToken(data.token);
         setUser(data.user);
+        localStorage.setItem('login_time', String(Date.now()));
         onLoginSuccess(data.user);
       }
     } catch (err) {

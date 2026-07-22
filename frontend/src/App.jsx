@@ -143,7 +143,7 @@ export default function App() {
   // Client Security Route Shield (Redirect non-admin away from forbidden routes)
   useEffect(() => {
     if (user && user.role !== 'admin') {
-      const forbidden = ['nodes', 'users', 'monitor', 'runtimes'];
+      const forbidden = ['nodes', 'monitor', 'runtimes'];
       if (forbidden.includes(activePage)) {
         setActivePage('dashboard');
       }
@@ -170,9 +170,25 @@ export default function App() {
   const handleLogout = () => {
     removeToken();
     localStorage.removeItem('user');
+    localStorage.removeItem('login_time');
     setUserState(null);
     window.location.href = '/';
   };
+
+  // 60-Minute Absolute Session Expiration Monitor (60m from last login)
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      const loginTime = Number(localStorage.getItem('login_time') || 0);
+      const now = Date.now();
+      const MAX_SESSION_MS = 60 * 60 * 1000; // 60 minutes
+      if (loginTime > 0 && now - loginTime >= MAX_SESSION_MS) {
+        alert('🔒 Security Notice: Your 60-minute session limit since last login has expired. Please sign in again.');
+        handleLogout();
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleRefresh = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -277,7 +293,7 @@ export default function App() {
             <Runtimes onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'users' && (
-            <Users onRefreshTrigger={refreshTrigger} />
+            <Users currentUser={user} onRefreshTrigger={refreshTrigger} />
           )}
           {activePage === 'nodes' && (
             <Nodes onRefreshTrigger={refreshTrigger} />

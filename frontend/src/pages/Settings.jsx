@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Tag
 } from 'lucide-react';
+import MaskedIP from '../components/MaskedIP';
 
 export default function Settings({ theme, setTheme, panelName, setPanelName }) {
   const { t } = useTranslation();
@@ -607,7 +608,7 @@ export default function Settings({ theme, setTheme, panelName, setPanelName }) {
                         {log.target || 'N/A'}
                       </td>
                       <td className="py-4 text-xs text-muted font-mono text-right">
-                        {log.ip || '127.0.0.1'}
+                        <MaskedIP ip={log.ip || '127.0.0.1'} />
                       </td>
                     </tr>
                   ))}

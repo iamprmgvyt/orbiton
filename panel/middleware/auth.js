@@ -4,13 +4,13 @@
 const jwt = require('jsonwebtoken');
 const { isRevoked } = require('./tokenBlacklist');
 
+const crypto = require('crypto');
 const DEFAULT_JWT_SECRETS = ['vps-panel-super-secret-change-me-2024', 'change-me-please-use-openssl-rand-hex-32'];
-const JWT_SECRET = process.env.JWT_SECRET;
+let JWT_SECRET = process.env.JWT_SECRET;
 
 if (!JWT_SECRET || DEFAULT_JWT_SECRETS.includes(JWT_SECRET)) {
-  console.error('\n❌ [CRITICAL SECURITY ERROR] JWT_SECRET is missing or set to an insecure default value in environment variables!');
-  console.error('👉 Please generate a secure secret using "openssl rand -hex 32" and set JWT_SECRET in panel/.env\n');
-  process.exit(1);
+  JWT_SECRET = crypto.randomBytes(32).toString('hex');
+  process.env.JWT_SECRET = JWT_SECRET;
 }
 
 function authMiddleware(req, res, next) {

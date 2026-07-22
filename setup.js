@@ -236,6 +236,36 @@ DAEMON_TOKEN=${daemonToken}
   fs.writeFileSync(path.join(__dirname, 'panel', '.env'), envContent);
   console.log(`${colors.green}✔ Panel .env configuration file written successfully.${colors.reset}`);
 
+  // Configure Initial Admin Account Interactively
+  console.log(`\n${colors.yellow}* Configure Initial Administrator Account:${colors.reset}`);
+  const adminUsername = await askQuestion('  Enter Admin Username [Default: admin]: ');
+  const finalUsername = adminUsername.trim() || 'admin';
+  const adminPassword = await askQuestion('  Enter Admin Password [Default: admin123456]: ');
+  const finalPassword = adminPassword.trim() || 'admin123456';
+
+  try {
+    const bcrypt = require('./panel/node_modules/bcryptjs');
+    const Database = require('./panel/node_modules/better-sqlite3');
+    const dataDir = process.env.DATA_DIR || (process.platform === 'win32' ? path.join(process.env.APPDATA || require('os').homedir(), 'orbiton-data') : '/opt/orbiton-data');
+    fs.mkdirSync(dataDir, { recursive: true });
+    const dbPath = path.join(dataDir, 'orbiton.db');
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    const hash = bcrypt.hashSync(finalPassword, 12);
+    db.prepare("INSERT OR REPLACE INTO users (id, username, password, role) VALUES (1, ?, ?, 'admin')").run(finalUsername, hash);
+    console.log(`${colors.green}✔ Admin account configured! Username: ${finalUsername} | Password: ${finalPassword}${colors.reset}`);
+  } catch (err) {
+    console.log(`${colors.yellow}⚠️ Initial admin setup notice: ${err.message}${colors.reset}`);
+  }
+
   // Configure Fail2ban automatically
   configureFail2ban();
 

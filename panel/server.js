@@ -2,6 +2,8 @@
 // Orbiton Panel - Main Server Entry Point
 // Central API and Web Router serving compiled React frontend.
 // ============================================================
+const path     = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 require('dotenv').config();
 const express  = require('express');
 const http     = require('http');
@@ -96,8 +98,8 @@ app.use((req, res, next) => {
 });
 
 // ─── Global IP Rate Limit (fallback) ─────────────────────────
-app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 300 }));
-app.use('/api/auth/login', rateLimit({ windowMs: 60 * 1000, max: 5 }));
+app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 10000 }));
+app.use('/api/auth/login', rateLimit({ windowMs: 60 * 1000, max: 30 }));
 
 // ─── Static Files ─────────────────────────────────────────────
 app.use(express.static(FRONTEND));
@@ -198,7 +200,15 @@ if (hasSSL) {
     }
   });
 
-  httpServer.listen(PORT, () => printBanner(PORT, false));
+  httpServer.listen(PORT, () => {
+    printBanner(PORT, false);
+    // Auto-set Codespaces ports 3000 & 9900 visibility to PUBLIC automatically
+    if (process.env.CODESPACES === 'true' || process.env.CODESPACE_NAME) {
+      try {
+        require('child_process').exec('gh codespace ports visibility 3000:public 9900:public 2>/dev/null', () => {});
+      } catch (_) {}
+    }
+  });
 
   primaryServer = httpServer;
 }

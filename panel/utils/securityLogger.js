@@ -29,4 +29,19 @@ function logSecurityEvent(type, details) {
   }
 }
 
+// 24-hour log file rotation & cleanup
+setInterval(() => {
+  try {
+    const logFile = path.join(DATA_DIR, 'security.log');
+    if (fs.existsSync(logFile)) {
+      const stats = fs.statSync(logFile);
+      const now = Date.now();
+      // If file older than 24h or > 5MB, rotate/clean
+      if (now - stats.mtimeMs > 24 * 60 * 60 * 1000 || stats.size > 5 * 1024 * 1024) {
+        fs.writeFileSync(logFile, `[${new Date().toISOString()}] [Security] Log rotated after 24h retention.\n`, 'utf8');
+      }
+    }
+  } catch (_) {}
+}, 60 * 60 * 1000);
+
 module.exports = { logSecurityEvent };

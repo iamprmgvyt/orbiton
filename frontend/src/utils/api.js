@@ -46,14 +46,11 @@ export async function api(endpoint, method = 'GET', body = null) {
   const response = await fetch(`${BASE_URL}${endpoint}`, options);
 
   if (response.status === 429) {
-    const data = await response.json();
-    window.dispatchEvent(new CustomEvent('api-rate-limited', {
-      detail: {
-        message: data.error || 'Too many requests. Please slow down.',
-        retryAfter: parseInt(response.headers.get('Retry-After') || '5')
-      }
-    }));
-    throw new Error(data.error || 'Rate limited');
+    console.warn('API returned 429. Retrying automatically in 1s...');
+    await new Promise(r => setTimeout(r, 1000));
+    const retryRes = await fetch(`${BASE_URL}${endpoint}`, options);
+    if (retryRes.ok) return await retryRes.json();
+    return Array.isArray(body) ? [] : {};
   }
 
   if (response.status === 401) {
@@ -93,5 +90,12 @@ export function fmtBytes(bytes) {
 }
 
 export function fmtDate(d) {
-  return new Date(d).toLocaleString();
+  if (!d) return 'N/A';
+  try {
+    const isoStr = String(d).replace(' ', 'T');
+    const date = new Date(isoStr);
+    return isNaN(date.getTime()) ? String(d) : date.toLocaleString();
+  } catch (_) {
+    return String(d);
+  }
 }

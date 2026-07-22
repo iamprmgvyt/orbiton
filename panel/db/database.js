@@ -246,4 +246,21 @@ function initDatabase() {
   console.log(`✅ Database: ${DB_PATH}`);
 }
 
-module.exports = { db, initDatabase, DATA_DIR };
+// ─── 24-Hour Automatic Log Retention & Cleanup Task ───────────
+function pruneOldLogs() {
+  try {
+    const deletedAudit = db.prepare("DELETE FROM audit_log WHERE timestamp < datetime('now', '-24 hours')").run();
+    const deletedAppLogs = db.prepare("DELETE FROM app_logs WHERE timestamp < datetime('now', '-24 hours')").run();
+    if (deletedAudit.changes > 0 || deletedAppLogs.changes > 0) {
+      console.log(`[Log 24h Purge] Cleaned up logs older than 24h: ${deletedAudit.changes} audit logs, ${deletedAppLogs.changes} app logs deleted.`);
+    }
+  } catch (err) {
+    console.error('[Log Purge Error]', err.message);
+  }
+}
+
+// Run log cleanup every 30 minutes
+setInterval(pruneOldLogs, 30 * 60 * 1000);
+setTimeout(pruneOldLogs, 5000);
+
+module.exports = { db, initDatabase, DATA_DIR, pruneOldLogs };

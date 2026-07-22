@@ -91,20 +91,21 @@ function PermissionsModal({ userId, username, onClose }) {
             <div className="text-center text-xs text-muted py-12">No hosted apps available to delegate permissions.</div>
           ) : (
             <div className="space-y-3">
-              {apps.map(app => {
-                const p = permissions[app.id] || { can_power: false, can_files: false, can_console: false };
+              {apps.filter(app => app && typeof app === 'object').map(app => {
+                const appId = app.id || Math.random();
+                const p = (permissions && permissions[appId]) || { can_power: false, can_files: false, can_console: false };
                 return (
-                  <div key={app.id} className="bg-surface/50 border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div key={appId} className="bg-surface/50 border border-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <span className="block text-sm font-bold text-text">{app.name}</span>
-                      <span className="block text-[10px] text-muted font-mono mt-0.5">{app.id}</span>
+                      <span className="block text-sm font-bold text-text">{app.name || 'Application'}</span>
+                      <span className="block text-[10px] text-muted font-mono mt-0.5">{appId}</span>
                     </div>
                     <div className="flex items-center gap-6">
                       <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={p.can_power}
-                          onChange={() => handleCheckboxChange(app.id, 'can_power')}
+                          checked={Boolean(p.can_power)}
+                          onChange={() => handleCheckboxChange(appId, 'can_power')}
                           className="accent-accent w-4 h-4 rounded"
                         />
                         Power Actions
@@ -112,8 +113,8 @@ function PermissionsModal({ userId, username, onClose }) {
                       <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={p.can_files}
-                          onChange={() => handleCheckboxChange(app.id, 'can_files')}
+                          checked={Boolean(p.can_files)}
+                          onChange={() => handleCheckboxChange(appId, 'can_files')}
                           className="accent-accent w-4 h-4 rounded"
                         />
                         Files Manager
@@ -121,8 +122,8 @@ function PermissionsModal({ userId, username, onClose }) {
                       <label className="flex items-center gap-2 text-xs text-text2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={p.can_console}
-                          onChange={() => handleCheckboxChange(app.id, 'can_console')}
+                          checked={Boolean(p.can_console)}
+                          onChange={() => handleCheckboxChange(appId, 'can_console')}
                           className="accent-accent w-4 h-4 rounded"
                         />
                         Live Console
@@ -155,9 +156,10 @@ function PermissionsModal({ userId, username, onClose }) {
   );
 }
 
-export default function Users({ currentUser, onRefreshTrigger }) {
+export default function Users({ currentUser = {}, onRefreshTrigger }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -168,11 +170,13 @@ export default function Users({ currentUser, onRefreshTrigger }) {
 
   const loadUsers = async () => {
     setLoading(true);
+    setError('');
     try {
       const data = await api('/auth/users');
       setUsers(data || []);
     } catch (err) {
       console.error(err);
+      setError(err.message || 'Failed to fetch users list.');
     } finally {
       setLoading(false);
     }
@@ -197,7 +201,7 @@ export default function Users({ currentUser, onRefreshTrigger }) {
   };
 
   const handleDeleteUser = async (id, name) => {
-    if (id === currentUser.id) {
+    if (currentUser?.id && id === currentUser.id) {
       alert("You cannot delete your own account!");
       return;
     }
@@ -220,6 +224,11 @@ export default function Users({ currentUser, onRefreshTrigger }) {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl font-medium">
+          ❌ {error}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-muted">Manage administrator and client access keys</p>
@@ -250,44 +259,60 @@ export default function Users({ currentUser, onRefreshTrigger }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 text-sm">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-surface/30">
-                  <td className="px-6 py-4 font-mono text-muted">{u.id}</td>
-                  <td className="px-6 py-4 font-bold text-text">{u.username}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                      u.role === 'admin'
-                        ? 'bg-accent/15 text-accent border border-accent/20'
-                        : 'bg-surface2 text-text2 border border-border'
-                    }`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-text2">{fmtDate(u.created_at)}</td>
-                  <td className="px-6 py-4 text-right flex justify-end gap-2">
-                    {u.id !== currentUser.id && u.role === 'user' && (
-                      <button
-                        onClick={() => setSelectedUser(u)}
-                        className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
-                        title="Configure permissions"
-                      >
-                        <Shield className="w-4 h-4" />
-                      </button>
-                    )}
-                    {u.id !== currentUser.id ? (
-                      <button
-                        onClick={() => handleDeleteUser(u.id, u.username)}
-                        className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
-                        title="Delete user"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted font-medium pr-2">You</span>
-                    )}
+              {!users || !Array.isArray(users) || users.filter(u => u && typeof u === 'object').length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="px-6 py-12 text-center text-xs text-muted">
+                    No access users found. Click "Create User Access" to add a new account.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                users.filter(u => u && typeof u === 'object').map((u) => {
+                  const userId = u.id;
+                  const uName = u.username || 'User';
+                  const uRole = u.role || 'user';
+                  const currentId = currentUser?.id;
+                  const isNotSelf = !currentId || userId !== currentId;
+
+                  return (
+                    <tr key={userId || Math.random()} className="hover:bg-surface/30">
+                      <td className="px-6 py-4 font-mono text-muted">{userId ?? 'N/A'}</td>
+                      <td className="px-6 py-4 font-bold text-text">{uName}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                          uRole === 'admin'
+                            ? 'bg-accent/15 text-accent border border-accent/20'
+                            : 'bg-surface2 text-text2 border border-border'
+                        }`}>
+                          {uRole}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-text2">{fmtDate(u.created_at)}</td>
+                      <td className="px-6 py-4 text-right flex justify-end gap-2">
+                        {isNotSelf && uRole === 'user' && (
+                          <button
+                            onClick={() => setSelectedUser(u)}
+                            className="p-2 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors"
+                            title="Configure permissions"
+                          >
+                            <Shield className="w-4 h-4" />
+                          </button>
+                        )}
+                        {isNotSelf ? (
+                          <button
+                            onClick={() => handleDeleteUser(userId, uName)}
+                            className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 transition-colors"
+                            title="Delete user"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-muted font-medium pr-2">You</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

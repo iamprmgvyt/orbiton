@@ -7,6 +7,21 @@ export default function Captcha({ onVerifyChange }) {
   const [num2, setNum2] = useState(0);
   const [userAnswer, setUserAnswer] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [humanInteracted, setHumanInteracted] = useState(false);
+
+  useEffect(() => {
+    const handleHumanActivity = () => {
+      setHumanInteracted(true);
+    };
+    window.addEventListener('mousemove', handleHumanActivity, { once: true });
+    window.addEventListener('touchstart', handleHumanActivity, { once: true });
+    window.addEventListener('keydown', handleHumanActivity, { once: true });
+    return () => {
+      window.removeEventListener('mousemove', handleHumanActivity);
+      window.removeEventListener('touchstart', handleHumanActivity);
+      window.removeEventListener('keydown', handleHumanActivity);
+    };
+  }, []);
 
   const generateChallenge = () => {
     const n1 = Math.floor(Math.random() * 15) + 2;
@@ -26,17 +41,37 @@ export default function Captcha({ onVerifyChange }) {
     setStatus('verifying');
     setErrorMsg('');
 
-    // Simulate smart Turnstile browser telemetry & mouse movement check
     setTimeout(() => {
-      // 80% chance auto-pass via Turnstile smart telemetry simulation, 20% prompt math challenge
-      const passDirect = true;
-      if (passDirect) {
-        setStatus('verified');
-        if (onVerifyChange) onVerifyChange(true);
-      } else {
+      // 1. Check for automated headless browsers (Selenium / Puppeteer / Playwright)
+      const isHeadlessBot = Boolean(
+        navigator.webdriver || 
+        window.document.documentElement.getAttribute('webdriver') ||
+        (navigator.userAgent && /headless/i.test(navigator.userAgent))
+      );
+
+      // 2. Check for missing real browser telemetry (screen width, languages, plugins)
+      const isRealBrowser = Boolean(
+        window.screen && window.screen.width > 0 && window.screen.height > 0 &&
+        navigator.languages && navigator.languages.length > 0
+      );
+
+      if (isHeadlessBot || !isRealBrowser) {
         setStatus('challenge');
+        setErrorMsg('🤖 Headless bot environment detected. Please complete the security math test.');
+        return;
       }
-    }, 900);
+
+      // 3. Human interaction check
+      if (!humanInteracted) {
+        setStatus('challenge');
+        setErrorMsg('Please complete the security test below.');
+        return;
+      }
+
+      // Passed 100% human browser telemetry!
+      setStatus('verified');
+      if (onVerifyChange) onVerifyChange(true);
+    }, 700);
   };
 
   const handleVerifyChallenge = (e) => {

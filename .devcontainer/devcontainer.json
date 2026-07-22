@@ -1,0 +1,16 @@
+{
+  "name": "Orbiton Codespace",
+  "forwardPorts": [3000, 9900],
+  "portsAttributes": {
+    "3000": {
+      "label": "Orbiton Web Panel",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
+    },
+    "9900": {
+      "label": "Orbiton Daemon Wings Agent",
+      "onAutoForward": "notify",
+      "visibility": "public"
+    }
+  }
+}

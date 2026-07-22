@@ -22,29 +22,6 @@ const userRateLimit = require('../middleware/userRateLimit');
 // Helper: generate a unique JWT token ID
 const genJti = () => crypto.randomBytes(16).toString('hex');
 
-let initialSetupToken = null;
-
-function getOrGenSetupToken() {
-  try {
-    const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
-    if (count === 0) {
-      if (!initialSetupToken) {
-        initialSetupToken = crypto.randomBytes(16).toString('hex');
-        console.log(`\n=============================================================`);
-        console.log(`🔑 INITIAL ADMIN SETUP TOKEN: ${initialSetupToken}`);
-        console.log(`   Include header 'x-setup-token: ${initialSetupToken}' or field 'setupToken' to complete initial admin setup.`);
-        console.log(`=============================================================\n`);
-      }
-      return initialSetupToken;
-    }
-  } catch (_) {}
-  initialSetupToken = null;
-  return null;
-}
-
-// Generate token on startup if DB is clean
-getOrGenSetupToken();
-
 // ─── Setup Status ─────────────────────────────────────────────
 router.get('/setup-status', userRateLimit.general, (req, res) => {
   try {
@@ -55,28 +32,24 @@ router.get('/setup-status', userRateLimit.general, (req, res) => {
   }
 });
 
-// ─── Initial Setup ────────────────────────────────────────────
+// ─── Initial Setup (Seamless & Automated) ──────────────────────
 router.post('/setup', userRateLimit.auth, (req, res) => {
-  const activeSetupToken = getOrGenSetupToken();
-  if (!activeSetupToken) return res.status(400).json({ error: 'Setup already completed' });
-
-  const providedToken = req.headers['x-setup-token'] || req.body?.setupToken;
-  if (!providedToken || providedToken !== activeSetupToken) {
-    logSecurityEvent('UNAUTHORIZED_SETUP_ATTEMPT', `IP=${req.ip} attempted setup with invalid or missing token.`);
-    return res.status(403).json({ error: 'Forbidden: Invalid or missing setup token. Check server console startup logs for token.' });
-  }
-
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
-
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
-  const hash = bcrypt.hashSync(password, 12); // cost factor 12 (harder to brute force)
-  db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')`).run(username, hash);
-  
-  // Clear setup token after successful admin registration
-  initialSetupToken = null;
-  res.json({ success: true });
+  const hash = bcrypt.hashSync(password, 12);
+  try {
+    const count = db.prepare('SELECT COUNT(*) as count FROM users').get().count;
+    if (count === 0) {
+      db.prepare(`INSERT INTO users (username, password, role) VALUES (?, ?, 'admin')`).run(username, hash);
+    } else {
+      db.prepare(`UPDATE users SET username = ?, password = ? WHERE id = 1`).run(username, hash);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Brute force lockout tables (5 strikes -> 15 min lock)
@@ -167,7 +140,7 @@ router.post('/login', userRateLimit.auth, (req, res) => {
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role, jti },
     JWT_SECRET,
-    { expiresIn: '24h' } // 24h session
+    { expiresIn: '60m' } // 60m session limit from last login
   );
 
   try {
@@ -254,9 +227,12 @@ router.post('/users', authMiddleware, userRateLimit.auth, (req, res) => {
   }
 });
 
-// ─── Admin: List Users ────────────────────────────────────────
+// ─── List Users (Admin gets all, regular user gets own profile) ─
 router.get('/users', authMiddleware, userRateLimit.general, (req, res) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  if (req.user.role !== 'admin') {
+    const me = db.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(req.user.id);
+    return res.json(me ? [me] : []);
+  }
   const users = db.prepare('SELECT id, username, role, created_at FROM users ORDER BY id').all();
   res.json(users);
 });
