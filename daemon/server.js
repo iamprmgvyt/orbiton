@@ -935,6 +935,14 @@ function printBanner(port) {
   console.log(logo);
 }
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ [Orbiton-Daemon] PORT CONFLICT ERROR: Daemon port ${PORT} is already in use by another process or systemd service!`);
+    console.error(`👉 Solution: Stop background daemon via 'sudo orbiton stop' or 'sudo systemctl stop orbiton-daemon'\n`);
+    process.exit(1);
+  }
+});
+
 server.listen(PORT, () => {
   printBanner(PORT);
 });

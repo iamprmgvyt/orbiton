@@ -160,8 +160,23 @@ if (hasSSL) {
   io = new Server(httpsServer, ioOptions);
   setupSocketHandlers(io);
 
-  httpsServer.listen(SSL_PORT, () => printBanner(SSL_PORT, true));
+  httpsServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ [Orbiton-Panel] PORT CONFLICT ERROR: Port ${PORT} (or SSL ${SSL_PORT}) is already in use!`);
+      console.error(`👉 Solution: Stop background service via 'sudo orbiton stop' or 'sudo systemctl stop orbiton-panel'\n`);
+      process.exit(1);
+    }
+  });
+  httpsServer.listen(SSL_PORT, () =>
+    console.log(`🔒 HTTPS Server running on :${SSL_PORT}`));
 
+  httpServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ [Orbiton-Panel] PORT CONFLICT ERROR: Port ${PORT} is already in use!`);
+      console.error(`👉 Solution: Stop background service via 'sudo orbiton stop' or 'sudo systemctl stop orbiton-panel'\n`);
+      process.exit(1);
+    }
+  });
   // Redirect HTTP → HTTPS
   http.createServer((req, res) => {
     const host = (req.headers.host || 'localhost').split(':')[0];
@@ -174,6 +189,14 @@ if (hasSSL) {
 } else {
   io = new Server(httpServer, ioOptions);
   setupSocketHandlers(io);
+
+  httpServer.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`\n❌ [Orbiton-Panel] PORT CONFLICT ERROR: Port ${PORT} is already in use by another process or systemd service!`);
+      console.error(`👉 Solution: Stop background service via 'sudo orbiton stop' or 'sudo systemctl stop orbiton-panel'\n`);
+      process.exit(1);
+    }
+  });
 
   httpServer.listen(PORT, () => printBanner(PORT, false));
 

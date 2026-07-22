@@ -476,6 +476,9 @@ async function main() {
   rl.close();
 
   if (startChoice.trim().toLowerCase() === 'y' || startChoice.trim().toLowerCase() === 'yes') {
+    console.log(`\n${colors.yellow}Stopping background systemd services (if any) to prevent port conflicts...${colors.reset}`);
+    runCmd('systemctl stop orbiton-panel orbiton-daemon || true');
+
     console.log(`\n${colors.green}Starting Orbiton services in development mode... (Press Ctrl+C to stop)${colors.reset}\n`);
     const { spawn } = require('child_process');
     const processes = [];
