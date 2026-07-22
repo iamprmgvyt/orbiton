@@ -25,15 +25,18 @@ function getModule(name) {
   try {
     return require(name);
   } catch (_) {
-    try {
-      const panelPath = path.join(PANEL_DIR, 'node_modules', name);
-      if (fs.existsSync(panelPath)) return require(panelPath);
-    } catch (_) {}
-    try {
-      const localPath = path.join(__dirname, 'panel', 'node_modules', name);
-      if (fs.existsSync(localPath)) return require(localPath);
-    } catch (_) {}
-    throw new Error(`Required module '${name}' is not installed.`);
+    const candidatePaths = [
+      path.join(PANEL_DIR, 'node_modules', name),
+      path.join(process.cwd(), 'panel', 'node_modules', name),
+      path.join(process.cwd(), 'node_modules', name),
+      path.join(__dirname, 'panel', 'node_modules', name)
+    ];
+    for (const p of candidatePaths) {
+      try {
+        if (fs.existsSync(p)) return require(p);
+      } catch (_) {}
+    }
+    throw new Error(`Required module '${name}' is not installed in Panel dependencies.`);
   }
 }
 
@@ -215,6 +218,10 @@ switch (command) {
       console.log(`${colors.red}❌ Usage: sudo orbiton create-admin <username> <password>${colors.reset}`);
       process.exit(1);
     }
+    if (password.length < 8) {
+      console.log(`${colors.red}❌ Security Error: Password must be at least 8 characters long (matches Web Panel security requirement).${colors.reset}`);
+      process.exit(1);
+    }
     try {
       const db = getDatabase();
       const bcrypt = getModule('bcryptjs');
@@ -231,6 +238,10 @@ switch (command) {
     const rPass = args[2];
     if (!rUser || !rPass) {
       console.log(`${colors.red}❌ Usage: sudo orbiton reset-password <username> <new_password>${colors.reset}`);
+      process.exit(1);
+    }
+    if (rPass.length < 8) {
+      console.log(`${colors.red}❌ Security Error: New password must be at least 8 characters long (matches Web Panel security requirement).${colors.reset}`);
       process.exit(1);
     }
     try {
