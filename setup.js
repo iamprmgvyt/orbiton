@@ -23,6 +23,35 @@ if (process.platform !== 'win32' && typeof process.getuid === 'function' && proc
 
 const askQuestion = (query) => new Promise((resolve) => rl.question(query, resolve));
 
+const askPassword = (query) => new Promise((resolve) => {
+  const pRl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  pRl._writeToOutput = function _writeToOutput(stringToWrite) {
+    if (pRl.line.length > 0 && stringToWrite.trim() !== '') {
+      pRl.output.write('\r' + query + '*'.repeat(pRl.line.length));
+    } else {
+      pRl.output.write(stringToWrite);
+    }
+  };
+  pRl.question(query, (answer) => {
+    pRl.close();
+    console.log();
+    resolve(answer);
+  });
+});
+
+function autoOpenCodespacesPorts() {
+  if (process.env.CODESPACES === 'true' || process.env.CODESPACE_NAME) {
+    console.log(`\n${colors.cyan}🌐 Auto-opening GitHub Codespaces Ports 3000 & 9900 to PUBLIC...${colors.reset}`);
+    try {
+      execSync('gh codespace ports visibility 3000:public 9900:public 2>/dev/null || true', { stdio: 'inherit' });
+      console.log(`${colors.green}✔ Ports 3000 (Web Panel) & 9900 (Daemon) are now PUBLIC!${colors.reset}`);
+    } catch (_) {}
+  }
+}
+
 // Colors for terminal output
 const colors = {
   reset: '\x1b[0m',
@@ -236,11 +265,11 @@ DAEMON_TOKEN=${daemonToken}
   fs.writeFileSync(path.join(__dirname, 'panel', '.env'), envContent);
   console.log(`${colors.green}✔ Panel .env configuration file written successfully.${colors.reset}`);
 
-  // Configure Initial Admin Account Interactively
+  // Configure Initial Admin Account Interactively (with **** masked password)
   console.log(`\n${colors.yellow}* Configure Initial Administrator Account:${colors.reset}`);
   const adminUsername = await askQuestion('  Enter Admin Username [Default: admin]: ');
   const finalUsername = adminUsername.trim() || 'admin';
-  const adminPassword = await askQuestion('  Enter Admin Password [Default: admin123456]: ');
+  const adminPassword = await askPassword('  Enter Admin Password [Default: admin123456]: ');
   const finalPassword = adminPassword.trim() || 'admin123456';
 
   try {
@@ -490,6 +519,9 @@ async function main() {
   console.log(`\n${colors.green}${colors.bright}================================================${colors.reset}`);
   console.log(`${colors.green}${colors.bright}🪐 Orbiton Node.js Setup Completed Successfully! ${colors.reset}`);
   console.log(`${colors.green}${colors.bright}================================================${colors.reset}`);
+  
+  // Auto-open GitHub Codespaces Ports 3000 & 9900 to Public ONLY after setup runs
+  autoOpenCodespacesPorts();
   
   if (selection === 0 || selection === 1) {
     console.log(`\nTo run the Panel in development mode:\n  ${colors.cyan}cd panel && node server.js${colors.reset}`);
