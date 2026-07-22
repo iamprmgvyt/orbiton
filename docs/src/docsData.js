@@ -23,13 +23,26 @@ git clone https://github.com/iamprmgvyt/orbiton.git
 cd orbiton
 sudo bash install.sh
 \`\`\`
-* Running the script will present the official interactive installation menu:
+* Running the script (\`install.sh\`) will present the official interactive installation menu:
   * **Option [0]:** Install both Panel and Daemon (All-in-One on the same machine) — ideal for single VPS setup.
   * **Option [1]:** Install Panel only (Central UI & User Database) — deploy this on your main control server.
   * **Option [2]:** Install Daemon only (Wings Agent on Node VPS) — deploy this on external worker nodes.
   * **Option [3]:** Configure Let's Encrypt SSL certificate — automatically generate and assign SSL to secure panel domain.
-  * **Option [4]:** Uninstall Panel & Daemon — completely purge all folders, databases, and systemd services.
-  * **Option [5]:** Cancel / Exit — cancel the installation.
+  * **Option [4]:** Configure Fail2ban automatic DDoS/brute-force IP ban shield — enable Fail2ban security jail for Panel logs.
+  * **Option [5]:** Uninstall Panel & Daemon — completely purge all folders, databases, and systemd services.
+  * **Option [6]:** Update Orbiton to the Latest Version & Restart Services — pull latest updates from GitHub and reload services.
+  * **Option [7]:** Cancel / Exit — cancel the installation.
+
+### Developer Setup (Node.js)
+Alternatively, for cross-platform or local development environments, run:
+\`\`\`bash
+sudo node setup.js
+\`\`\`
+* Node.js installer options:
+  * **Option [0]:** Install both Panel and Daemon (All-in-One)
+  * **Option [1]:** Install Panel only
+  * **Option [2]:** Install Daemon only
+  * **Option [3]:** Cancel
     `
   },
   {
