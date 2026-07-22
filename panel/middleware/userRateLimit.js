@@ -6,11 +6,34 @@
 // Zero dependency on external packages — pure Map/Set for low RAM VPS.
 // ============================================================
 
+const fs   = require('fs');
+const path = require('path');
 const { logSecurityEvent } = require('../utils/securityLogger');
+
+// Architecture Note: State is maintained in-memory (with file persistence for IP blacklists).
+// Designed specifically for lightweight single-process Node.js deployments.
 
 const requestTracker = new Map();   // { id → record }
 const penaltyBox     = new Map();   // { id → { until, strikes } } temporary blocks
 const ipBlacklist    = new Set();   // permanent blocks for serial abusers
+
+const DATA_DIR = process.env.DATA_DIR || (process.platform === 'win32' ? path.join(process.env.APPDATA || require('os').homedir(), 'orbiton-data') : '/opt/orbiton-data');
+const BLACKLIST_FILE = path.join(DATA_DIR, 'ip_blacklist.json');
+
+// Load persisted IP blacklist on startup
+try {
+  if (fs.existsSync(BLACKLIST_FILE)) {
+    const list = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf8'));
+    if (Array.isArray(list)) list.forEach(ip => ipBlacklist.add(ip));
+  }
+} catch (_) {}
+
+function saveBlacklist() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(Array.from(ipBlacklist)), 'utf8');
+  } catch (_) {}
+}
 
 // Auto-cleanup every 5 minutes to prevent memory leaks on 1GB VPS
 setInterval(() => {
@@ -107,6 +130,7 @@ function createLimiter(options = {}) {
       // After 5 strikes → permanent blacklist
       if (strikes >= 5 && ipOnly) {
         ipBlacklist.add(req.ip);
+        saveBlacklist();
         logSecurityEvent('IP_BAN', `IP=${req.ip} permanently banned due to heavy spam.`);
         return res.status(403).json({ error: 'Your IP has been permanently banned for repeated spam attacks.' });
       }

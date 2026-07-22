@@ -11,6 +11,7 @@ const helmet  = require('helmet');
 const os      = require('os');
 const fs      = require('fs');
 const path    = require('path');
+const crypto  = require('crypto');
 const pty     = require('node-pty');
 
 const processManager = require('./managers/processManager');
@@ -34,16 +35,30 @@ if (!DAEMON_TOKEN || DEFAULT_DAEMON_TOKENS.includes(DAEMON_TOKEN)) {
   process.exit(1);
 }
 
+// Constant-time token comparison helper (timing attack protection)
+function safeTokenCompare(providedToken, expectedToken) {
+  if (typeof providedToken !== 'string' || typeof expectedToken !== 'string') return false;
+  const a = Buffer.from(providedToken);
+  const b = Buffer.from(expectedToken);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 app.use(helmet());
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : [];
+
+function checkCorsOrigin(origin, callback) {
+  if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('https://localhost') || origin.startsWith('https://127.0.0.1')) {
+    return callback(null, true);
   }
+  if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+  return callback(new Error('Not allowed by CORS'));
+}
+
+app.use(cors({
+  origin: checkCorsOrigin
 }));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
@@ -55,7 +70,7 @@ const authMiddleware = (req, res, next) => {
     return res.status(401).json({ error: 'Unauthorized: Missing token' });
   }
   const token = authHeader.split(' ')[1];
-  if (token !== DAEMON_TOKEN) {
+  if (!safeTokenCompare(token, DAEMON_TOKEN)) {
     return res.status(403).json({ error: 'Forbidden: Invalid daemon token' });
   }
   next();
@@ -824,22 +839,16 @@ app.post('/api/apps/:appId/logs/clear', (req, res) => {
 // ─── Socket.IO WebSockets ─────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: checkCorsOrigin,
     methods: ["GET", "POST"]
   }
 });
 processManager.setIO(io);
 
-// Socket.io Authorization Token Check
+// Socket.io Authorization Token Check (timing attack protected)
 io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (token !== DAEMON_TOKEN) {
+  const token = socket.handshake.auth?.token;
+  if (!safeTokenCompare(token, DAEMON_TOKEN)) {
     return next(new Error('Unauthorized'));
   }
   next();

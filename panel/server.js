@@ -60,22 +60,30 @@ app.use(helmet({
   } : false   // Never send HSTS over plain HTTP
 }));
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [];
+const allowedOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()) : [];
+
+function checkCorsOrigin(origin, callback) {
+  // Allow same-origin / non-browser requests (no Origin header) or localhost/127.0.0.1
+  if (!origin || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('https://localhost') || origin.startsWith('https://127.0.0.1')) {
+    return callback(null, true);
+  }
+  // Allow explicitly configured origins when ALLOWED_ORIGINS is set
+  if (allowedOrigins.length > 0 && allowedOrigins.includes(origin)) {
+    return callback(null, true);
+  }
+  return callback(new Error('Not allowed by CORS'));
+}
+
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: checkCorsOrigin,
   credentials: true
 }));
+
+// ─── Security Guard (runs BEFORE body parsing to block payload bombs early) ───
+app.use(requestGuard);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// ─── Security Guard (runs before all routes) ──────────────────
-app.use(requestGuard);
 
 // ─── Additional Security Headers ─────────────────────────────
 app.use((req, res, next) => {
@@ -124,13 +132,7 @@ let   io, primaryServer;
 
 const ioOptions = {
   cors: {
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.length === 0 || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
+    origin: checkCorsOrigin,
     methods: ["GET", "POST"]
   },
   maxHttpBufferSize: 1e8

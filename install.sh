@@ -272,6 +272,8 @@ install_panel() {
   if [ "$port_choice" == "1" ]; then
     PANEL_PORT=80
     echo -e "  ${GREEN}✔ Panel configured to run on Port 80 (Main IP).${NC}"
+    echo -e "  ${YELLOW}⚠️ SECURITY WARNING: Running Node.js directly on Port 80 exposes your Master Panel directly to Internet scans.${NC}"
+    echo -e "  ${YELLOW}   It is strongly recommended to place an Nginx Reverse Proxy (see nginx.conf.example) in front of the Panel!${NC}"
   else
     echo -n -e "  Enter custom port [Default: 3000]: "
     read -r custom_port
@@ -380,6 +382,13 @@ EOF
   systemctl daemon-reload
   systemctl enable orbiton-daemon --quiet
   systemctl start orbiton-daemon
+
+  # Restrict Daemon network access (Server-to-Server agent port)
+  if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+    echo -e "${YELLOW}🛡️ Hardening firewall for Daemon port 9900 (allowing localhost loopback)...${NC}"
+    ufw allow from 127.0.0.1 to any port 9900 proto tcp >> $LOG_PATH 2>&1 || true
+  fi
+
   echo -e "${GREEN}✔ Orbiton Daemon (Wings) started on port 9900!${NC}"
 }
 

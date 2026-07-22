@@ -30,7 +30,12 @@ const DANGEROUS_HEADER_PATTERNS = [
  * Blocks probes, injection attempts, oversized requests, and raw tool queries.
  */
 function requestGuard(req, res, next) {
-  const url = decodeURIComponent(req.url || '');
+  let url = '';
+  try {
+    url = decodeURIComponent(req.url || '');
+  } catch (_) {
+    return res.status(400).json({ error: 'Malformed URL encoding.' });
+  }
 
   // 1. Block path traversal & injection probes
   for (const pattern of DANGEROUS_PATH_PATTERNS) {

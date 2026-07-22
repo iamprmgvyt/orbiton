@@ -519,7 +519,7 @@ router.post('/:id/logs/clear', checkPermission('console'), async (req, res) => {
 });
 
 // ─── Import: Git Clone ────────────────────────────────────────
-router.post('/:id/import/git', async (req, res) => {
+router.post('/:id/import/git', checkPermission('files'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   const { url, branch } = req.body;
@@ -533,7 +533,7 @@ router.post('/:id/import/git', async (req, res) => {
 });
 
 // ─── Import: ZIP Upload ───────────────────────────────────────
-router.post('/:id/import/zip', zipUpload.single('file'), async (req, res) => {
+router.post('/:id/import/zip', checkPermission('files'), zipUpload.single('file'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   if (!req.file) return res.status(400).json({ error: 'ZIP file required' });
@@ -576,7 +576,7 @@ router.post('/:id/import/zip', zipUpload.single('file'), async (req, res) => {
 });
 
 // ─── Import: Docker Pull ──────────────────────────────────────
-router.post('/:id/import/docker', async (req, res) => {
+router.post('/:id/import/docker', checkPermission('files'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   const { image } = req.body;
@@ -611,7 +611,7 @@ function getAuthorizedApp(req, res) {
 }
 
 // GET /api/apps/:id/logs-history - Fetch historical console logs
-router.get('/:id/logs-history', async (req, res) => {
+router.get('/:id/logs-history', checkPermission('console'), async (req, res) => {
   const app = getAuthorizedApp(req, res);
   if (!app) return;
   try {

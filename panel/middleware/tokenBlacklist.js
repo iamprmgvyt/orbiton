@@ -2,7 +2,8 @@
 // Orbiton JWT Token Blacklist
 // Allows server-side revocation of JWT tokens on logout.
 // Without this, stolen tokens stay valid until they expire.
-// Uses an in-memory Set with TTL cleanup to prevent RAM leak.
+// Uses an in-memory Map with TTL cleanup to prevent RAM leak.
+// Architecture Note: In-memory state designed specifically for single-process deployments.
 // ============================================================
 
 // { token_jti → expiry_timestamp }
